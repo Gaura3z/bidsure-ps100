@@ -10,7 +10,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export interface KeyProviderSlot {
-  label: 'OPENAI' | 'PRIMARY' | 'SECONDARY' | 'LEGACY';
+  label: 'OPENAI' | 'OPENAI_SECONDARY' | 'OPENAI_TERTIARY' | 'PRIMARY' | 'SECONDARY' | 'LEGACY';
   kind: 'OPENAI' | 'GEMINI';
   apiKey: string;
   masked: string;
@@ -74,21 +74,25 @@ class ResilientAIProvider {
 
   public initProviders() {
     this.providers = [];
-    const openAI = process.env.OPENAI_API_KEY?.trim();
+    const openAIKeys = [
+      process.env.OPENAI_API_KEY,
+      process.env.OPENAI_SECONDARY_API_KEY,
+      process.env.OPENAI_TERTIARY_API_KEY,
+    ].map((key) => key?.trim()).filter((key): key is string => Boolean(key));
     const primary = process.env.PRIMARY_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim() || process.env.GOOGLE_API_KEY?.trim();
     const secondary = process.env.SECONDARY_API_KEY?.trim();
     const legacy = process.env.GEMINI_API_KEY?.trim() || process.env.GOOGLE_API_KEY?.trim();
 
-    if (openAI) {
+    openAIKeys.forEach((apiKey, index) => {
       this.providers.push({
-        label: 'OPENAI',
+        label: index === 0 ? 'OPENAI' : index === 1 ? 'OPENAI_SECONDARY' : 'OPENAI_TERTIARY',
         kind: 'OPENAI',
-        apiKey: openAI,
-        masked: maskKey(openAI),
+        apiKey,
+        masked: maskKey(apiKey),
         model: this.openAIModel,
         failureCount: 0,
       });
-    }
+    });
 
     if (primary) {
       this.providers.push({
@@ -230,7 +234,7 @@ class ResilientAIProvider {
   }
 
   public async checkHealth(): Promise<ProviderDiagnostic> {
-    const primarySlot = this.providers.find((p) => p.label === 'OPENAI');
+    const primarySlot = this.providers.find((p) => p.kind === 'OPENAI');
     const secondarySlot = this.providers.find((p) => p.label === 'SECONDARY');
 
     if (this.providers.length === 0) {
@@ -289,7 +293,7 @@ class ResilientAIProvider {
   }
 
   public getConfigurationSnapshot(): ProviderDiagnostic {
-    const primarySlot = this.providers.find((p) => p.label === 'OPENAI');
+    const primarySlot = this.providers.find((p) => p.kind === 'OPENAI');
     const secondarySlot = this.providers.find((p) => p.label === 'SECONDARY');
     const configured = this.providers.length > 0;
     return {

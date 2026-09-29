@@ -49,6 +49,16 @@ The service-role key must stay only in `.env` or a deployment secret manager. Th
 
 If the service-role key is not configured, leave `DOCUMENT_STORAGE=local`; local files go under ignored `data/uploads/` for development.
 
+## 6. Google OAuth authentication
+
+The server now exposes `/api/auth/google/start` and `/api/auth/google/callback`. Before enabling this button, configure Google as a Supabase Auth provider and add this callback URL in both Supabase and Google Cloud:
+
+```text
+http://localhost:3000/api/auth/google/callback
+```
+
+For deployment, add the equivalent HTTPS callback URL. Set `SUPABASE_PUBLISHABLE_KEY` in the server environment. The callback verifies the Google session through Supabase and maps the verified email to an existing BidSure user; it never accepts a role from the browser.
+
 The migration creates 14 tables covering organizations, users, tenders, requirements, bidders, submissions, documents, extractions, source records, verification results, scores, recommendations, decisions, and audit events.
 
 ## 4. Verify in Supabase

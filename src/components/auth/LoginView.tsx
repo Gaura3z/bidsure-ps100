@@ -52,6 +52,10 @@ export const LoginView: React.FC<LoginViewProps> = ({
     onNavigateToDashboard();
   };
 
+  const handleGoogleLogin = () => {
+    window.location.assign('/api/auth/google/start');
+  };
+
   return (
     <div className="max-w-md mx-auto my-6 animate-in fade-in duration-300">
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden">
@@ -268,6 +272,15 @@ export const LoginView: React.FC<LoginViewProps> = ({
           >
             <span className="text-base">🏛️</span>
             <span>Login with Government SSO (Parichay)</span>
+          </button>
+
+          <button
+            onClick={handleGoogleLogin}
+            type="button"
+            className="w-full py-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-bold rounded-xl text-xs flex items-center justify-center gap-2.5 transition-all cursor-pointer"
+          >
+            <span className="text-base">G</span>
+            <span>Continue with Google</span>
           </button>
         </div>
 

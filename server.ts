@@ -8,6 +8,7 @@ import { storage } from './src/db/storage.ts';
 import { aiProvider } from './src/services/aiProvider.ts';
 import { storeDocument } from './src/services/documentStorage.ts';
 import { extractTextWithLocalOcr, scanForMalware } from './src/services/documentPipeline.ts';
+import { createClient } from '@supabase/supabase-js';
 import {
   Tender,
   TenderRequirement,
@@ -230,6 +231,34 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   storage.save();
   logAuditEvent('USER_LOGIN', 'TENDER', user.id, `${user.name} (${user.role}) logged in to BIDSure workbench.`, user);
   res.json({ success: true, user: db.currentUser });
+});
+
+// Production authentication boundary. Supabase verifies Google OAuth; BidSure maps the verified email to a database role.
+app.get('/api/auth/google/start', async (_req: Request, res: Response) => {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) return res.status(503).json({ error: 'Google authentication is not configured yet.' });
+  const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: `${process.env.APP_URL || 'http://localhost:3000'}/api/auth/google/callback` },
+  });
+  if (error || !data.url) return res.status(503).json({ error: 'Google authentication could not be started.' });
+  res.redirect(data.url);
+});
+
+app.get('/api/auth/google/callback', async (req: Request, res: Response) => {
+  const code = typeof req.query.code === 'string' ? req.query.code : undefined;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_PUBLISHABLE_KEY;
+  if (!code || !url || !key) return res.status(400).send('Google authentication configuration is incomplete.');
+  const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+  const email = data.user?.email?.toLowerCase();
+  const user = email ? db.users.find((candidate) => candidate.email.toLowerCase() === email) : undefined;
+  if (error || !user) return res.status(403).send('Google account is not mapped to an approved BidSure user.');
+  issueSession(res, user);
+  res.redirect('/');
 });
 
 // Tenders

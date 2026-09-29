@@ -32,6 +32,7 @@ import {
   OfficerDecision,
   AuditEvent,
 } from './schema.ts';
+import { loadPostgresState, persistPostgresState } from './postgresStorage.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -87,9 +88,11 @@ function getDefaultState(): DatabaseState {
 
 class StorageEngine {
   private state: DatabaseState;
+  private readonly postgresMode: boolean;
 
-  constructor() {
-    this.state = this.load();
+  constructor(initialState: DatabaseState, postgresMode: boolean) {
+    this.state = initialState;
+    this.postgresMode = postgresMode;
   }
 
   private ensureDir() {
@@ -98,7 +101,7 @@ class StorageEngine {
     }
   }
 
-  private load(): DatabaseState {
+  public load(): DatabaseState {
     try {
       this.ensureDir();
       if (fs.existsSync(DB_FILE)) {
@@ -130,7 +133,11 @@ class StorageEngine {
   }
 
   public save() {
-    this.saveDirect(this.state);
+    if (this.postgresMode) {
+      void persistPostgresState(this.state).catch((err) => console.error('[BIDSure DB] PostgreSQL write error:', err));
+    } else {
+      this.saveDirect(this.state);
+    }
   }
 
   public getDb(): DatabaseState {
@@ -144,5 +151,11 @@ class StorageEngine {
   }
 }
 
-export const storage = new StorageEngine();
+const postgresMode = process.env.STORAGE_MODE === 'postgres';
+if (postgresMode && !process.env.DATABASE_URL) {
+  throw new Error('STORAGE_MODE=postgres requires DATABASE_URL.');
+}
+
+const initialState = postgresMode ? await loadPostgresState() : new StorageEngine({} as DatabaseState, false)['load']();
+export const storage = new StorageEngine(initialState, postgresMode);
 export const db = storage.getDb();

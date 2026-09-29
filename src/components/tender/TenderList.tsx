@@ -17,6 +17,7 @@ interface TenderListProps {
   submissions: BidSubmission[];
   onSelectTender: (tenderId: string) => void;
   onOpenCreateTender: () => void;
+  canCreateTender?: boolean;
 }
 
 export const TenderList: React.FC<TenderListProps> = ({
@@ -24,6 +25,7 @@ export const TenderList: React.FC<TenderListProps> = ({
   submissions,
   onSelectTender,
   onOpenCreateTender,
+  canCreateTender = true,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
@@ -52,13 +54,15 @@ export const TenderList: React.FC<TenderListProps> = ({
             </p>
           </div>
 
-          <button
-            onClick={onOpenCreateTender}
-            className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold flex items-center gap-2 shadow-sm transition-all cursor-pointer self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            Create New Tender
-          </button>
+          {canCreateTender && (
+            <button
+              onClick={onOpenCreateTender}
+              className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold flex items-center gap-2 shadow-sm transition-all cursor-pointer self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4" />
+              Create New Tender
+            </button>
+          )}
         </div>
 
         {/* Filters */}

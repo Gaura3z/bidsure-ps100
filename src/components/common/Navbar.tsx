@@ -106,7 +106,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Quick Role Switcher Bar - 1-Click Profile Switching */}
-      <div className="bg-slate-900 border-b border-slate-800 py-1.5 px-4 text-xs text-white">
+      <div className="hidden bg-slate-900 border-b border-slate-800 py-1.5 px-4 text-xs text-white">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -287,7 +287,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             {/* Role Switcher Menu */}
-            {isRoleDropdownOpen && (
+            {false && isRoleDropdownOpen && (
               <>
                 <div
                   className="fixed inset-0 z-45"
@@ -365,7 +365,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       {isMobileMenuOpen && (
         <div className="md:hidden border-t border-slate-200 bg-white p-3 space-y-2 shadow-lg animate-in slide-in-from-top-2 duration-150 text-xs font-semibold">
           {/* Mobile Role Switcher */}
-          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
+          <div className="hidden p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
             <div className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Switch Profile:</div>
             <div className="grid grid-cols-1 gap-1">
               <button

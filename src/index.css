@@ -10,6 +10,38 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  html, #root {
+    width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  button, input, textarea, select {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .max-w-7xl {
+    max-width: 100%;
+  }
+
+  main {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  h1, h2, h3 {
+    overflow-wrap: anywhere;
   }
 }
 

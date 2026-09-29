@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import {
   Tender,
   Bidder,
@@ -401,6 +402,15 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+        {!['LANDING', 'LOGIN', 'DASHBOARD'].includes(activeTab) && (
+          <button
+            onClick={() => setActiveTab('DASHBOARD')}
+            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </button>
+        )}
         {activeTab === 'LANDING' && (
           <LandingView
             onGetStarted={() => setActiveTab('DASHBOARD')}
@@ -445,6 +455,7 @@ export default function App() {
             submissions={submissions}
             onSelectTender={() => setActiveTab('EVALUATION')}
             onOpenCreateTender={() => setIsCreateTenderModalOpen(true)}
+            canCreateTender={currentUser.role === 'PROCUREMENT_OFFICER'}
           />
         )}
 

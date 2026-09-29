@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bidsure_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: bidsure_user
+      POSTGRES_PASSWORD: bidsure_secure_password
+      POSTGRES_DB: bidsure_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - bidsure_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bidsure_user -d bidsure_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  bidsure_pgdata:

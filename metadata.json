@@ -1,0 +1,6 @@
+{
+  "name": "BidSure - AI-Powered Bid Compliance Verification Platform",
+  "description": "Evidence-first, tender-aware bid compliance verification workbench for GeM procurement officers with multi-source statutory verification, deterministic rules engine, and full auditability.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

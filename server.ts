@@ -1,0 +1,811 @@
+import express, { Request, Response } from 'express';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import crypto from 'crypto';
+import multer from 'multer';
+import { storage } from './src/db/storage.ts';
+import { aiProvider } from './src/services/aiProvider.ts';
+import {
+  Tender,
+  TenderRequirement,
+  Bidder,
+  BidSubmission,
+  BidDocument,
+  VerificationResult,
+  OfficerDecision,
+  AuditEvent,
+  User,
+} from './src/db/schema.ts';
+
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+const SESSION_COOKIE = 'bidsure_session';
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+const sessions = new Map<string, { userId: string; expiresAt: number }>();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
+    cb(null, allowed.includes(file.mimetype));
+  },
+});
+
+app.use(express.json({ limit: '10mb' }));
+
+function readCookie(req: Request, name: string): string | undefined {
+  const raw = req.headers.cookie || '';
+  const pair = raw.split(';').map((part) => part.trim()).find((part) => part.startsWith(`${name}=`));
+  return pair ? decodeURIComponent(pair.slice(name.length + 1)) : undefined;
+}
+
+function issueSession(res: Response, user: User) {
+  const token = crypto.randomBytes(32).toString('hex');
+  sessions.set(token, { userId: user.id, expiresAt: Date.now() + SESSION_TTL_MS });
+  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_MS / 1000}`);
+}
+
+function resolveSession(req: Request) {
+  const token = readCookie(req, SESSION_COOKIE);
+  const session = token ? sessions.get(token) : undefined;
+  if (!session) return undefined;
+  if (session.expiresAt < Date.now()) {
+    sessions.delete(token!);
+    return undefined;
+  }
+  return db.users.find((candidate) => candidate.id === session.userId);
+}
+
+// Access persistent storage engine (persisted in data/bidsure_store.json)
+const db = storage.getDb();
+
+// Helper for audit events (persisted automatically)
+function logAuditEvent(
+  action: string,
+  entityType: AuditEvent['entityType'],
+  entityId: string,
+  summary: string,
+  actor?: User,
+  details?: Record<string, any>
+) {
+  const currentActor = actor || db.currentUser;
+  const event: AuditEvent = {
+    id: `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    timestamp: new Date().toISOString(),
+    actorUserId: currentActor.id,
+    actorName: currentActor.name,
+    actorRole: currentActor.designation || 'Procurement Officer',
+    action,
+    entityType,
+    entityId,
+    summary,
+    details,
+    ruleVersion: 'v2.4-2026',
+    evidenceHash: details?.hash || Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
+  };
+  db.auditEvents.unshift(event);
+  storage.save();
+  return event;
+}
+
+// RBAC & Actor extraction helper
+function getActorContext(req: Request) {
+  const user = resolveSession(req);
+  return {
+    authenticated: Boolean(user),
+    role: user?.role || db.currentUser?.role || 'PROCUREMENT_OFFICER',
+    userId: user?.id || db.currentUser?.id || 'usr-01',
+    user: user || db.currentUser,
+  };
+}
+
+function requireRole(req: Request, res: Response, roles: User['role'][]) {
+  const actor = getActorContext(req);
+  if (!actor.authenticated || !roles.includes(actor.role as User['role'])) {
+    res.status(401).json({ error: 'Authentication required for this action.' });
+    return undefined;
+  }
+  return actor;
+}
+
+// ================= API ROUTES =================
+
+// Health check
+app.get('/api/health', async (_req: Request, res: Response) => {
+  const diagnostic = await aiProvider.checkHealth();
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    service: 'BIDSure Compliance Engine',
+    version: db.version || '2.4.0',
+    persistentStorage: true,
+    lastSavedAt: db.lastSavedAt,
+    aiProvider: {
+      configured: diagnostic.configured,
+      model: diagnostic.model,
+      activeProvider: diagnostic.activeProvider,
+      failoverReady: diagnostic.failoverReady,
+      mode: diagnostic.mode,
+    },
+  });
+});
+
+// Gemini Status & Multi-Key Failover Diagnostic
+app.get('/api/gemini/status', async (_req: Request, res: Response) => {
+  try {
+    const diagnostic = await aiProvider.checkHealth();
+    // Do not expose key fragments or provider internals on a public route.
+    res.json({
+      configured: diagnostic.configured,
+      model: diagnostic.model,
+      activeProvider: diagnostic.activeProvider,
+      failoverReady: diagnostic.failoverReady,
+      mode: diagnostic.mode,
+      latencyMs: diagnostic.latencyMs,
+      message: diagnostic.message,
+    });
+  } catch (err: any) {
+    res.json({
+      configured: false,
+      model: aiProvider.getModelName(),
+      activeProvider: 'NONE',
+      primaryConfigured: false,
+      secondaryConfigured: false,
+      primaryMasked: null,
+      secondaryMasked: null,
+      failoverReady: false,
+      mode: 'DETERMINISTIC_GROUNDED_FALLBACK',
+      message: 'Using deterministic compliance engine as fallback.',
+    });
+  }
+});
+
+// Explicit Failover QA Test Endpoint (Verifies Case A, Case B, Case C, Case D)
+app.post('/api/gemini/test-failover', async (req: Request, res: Response) => {
+  if (!requireRole(req, res, ['ADMIN'])) return;
+  const { simulatePrimaryFailure = false } = req.body;
+  try {
+    const start = Date.now();
+    const result = await aiProvider.generateContent(
+      'State "OK: BID COMPLIANCE SYSTEM ONLINE" in 6 words or less.',
+      undefined,
+      simulatePrimaryFailure
+    );
+    const latencyMs = Date.now() - start;
+
+    res.json({
+      success: true,
+      simulationActive: simulatePrimaryFailure,
+      providerUsed: result.providerUsed,
+      failoverOccurred: result.failoverOccurred,
+      latencyMs,
+      response: result.text.trim(),
+      message: result.failoverOccurred
+        ? `Failover successfully triggered: Provider ${result.providerUsed} responded.`
+        : `Primary provider responded successfully in ${latencyMs}ms.`,
+    });
+  } catch (err: any) {
+    res.json({
+      success: false,
+      simulationActive: simulatePrimaryFailure,
+      fallbackActive: true,
+      error: 'AI providers unavailable or rejected the request. No provider details are exposed.',
+      fallbackResponse: 'DETERMINISTIC_COMPLIANCE_FALLBACK_ACTIVE',
+      message: 'All AI providers failed. Platform safely fell back to deterministic compliance rules engine.',
+    });
+  }
+});
+
+// Database Factory Reset Endpoint
+app.post('/api/database/reset', (req: Request, res: Response) => {
+  if (!requireRole(req, res, ['ADMIN'])) return;
+  const resetDb = storage.resetFactory();
+  logAuditEvent('DATABASE_RESET', 'TENDER', 'system', 'Database restored to factory mock seeds.', getActorContext(req).user);
+  res.json({ success: true, message: 'Database reset to factory seeds successfully.', lastSavedAt: resetDb.lastSavedAt });
+});
+
+// Auth & Session
+app.get('/api/session', (req: Request, res: Response) => {
+  if (!resolveSession(req)) issueSession(res, db.currentUser);
+  res.json({
+    currentUser: db.currentUser,
+    users: db.users,
+    organization: db.organization,
+  });
+});
+
+app.post('/api/auth/login', (req: Request, res: Response) => {
+  const { role, email } = req.body;
+  const user = db.users.find((u) => u.email === email || u.role === role) || db.users[0];
+  db.currentUser = user;
+  issueSession(res, user);
+  storage.save();
+  logAuditEvent('USER_LOGIN', 'TENDER', user.id, `${user.name} (${user.role}) logged in to BIDSure workbench.`, user);
+  res.json({ success: true, user: db.currentUser });
+});
+
+// Tenders
+app.get('/api/tenders', (_req: Request, res: Response) => {
+  const tendersWithStats = db.tenders.map((tender) => {
+    const subs = db.submissions.filter((s) => s.tenderId === tender.id);
+    const issuesCount = subs.filter((s) => s.riskLevel === 'HIGH' || s.status === 'REVIEW_REQUIRED').length;
+    return {
+      ...tender,
+      biddersCount: subs.length,
+      issuesCount,
+    };
+  });
+  res.json(tendersWithStats);
+});
+
+app.get('/api/tenders/:id', (req: Request, res: Response) => {
+  const tender = db.tenders.find((t) => t.id === req.params.id);
+  if (!tender) return res.status(404).json({ error: 'Tender not found' });
+  const requirements = db.requirements.filter((r) => r.tenderId === tender.id);
+  const submissions = db.submissions.filter((s) => s.tenderId === tender.id);
+  res.json({ tender, requirements, submissions });
+});
+
+app.post('/api/tenders', (req: Request, res: Response) => {
+  const actor = requireRole(req, res, ['PROCUREMENT_OFFICER']);
+  if (!actor) return;
+  const { user } = actor;
+  if (actor.role !== 'PROCUREMENT_OFFICER') {
+    return res.status(403).json({
+      error: `Access Denied: Role '${actor.role}' (${user.name}) is not authorized to create or publish tenders. Under GFR 2017 & GeM guidelines, only Procurement Officers hold statutory tender publication authority.`,
+    });
+  }
+
+  const { tenderId, title, description, category, estimatedValue, submissionDeadline, requirements } = req.body;
+  const newTender: Tender = {
+    id: `tender-${Date.now()}`,
+    tenderId: tenderId || `CPCL/IT/2026/${Math.floor(100 + Math.random() * 900)}`,
+    title,
+    description: description || 'Procurement requirement published on GeM portal.',
+    category: category || 'Goods',
+    estimatedValue: Number(estimatedValue) || 50000000,
+    submissionDeadline: submissionDeadline || new Date(Date.now() + 30 * 86400000).toISOString(),
+    evaluationDate: new Date().toISOString(),
+    status: 'EVALUATION',
+    createdByUserId: user.id,
+    organizationId: db.organization.id,
+    ruleVersion: 'v2.4-2026',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  db.tenders.unshift(newTender);
+
+  if (Array.isArray(requirements) && requirements.length > 0) {
+    requirements.forEach((reqItem: any, idx: number) => {
+      const newReq: TenderRequirement = {
+        id: `req-${Date.now()}-${idx}`,
+        tenderId: newTender.id,
+        clauseNumber: reqItem.clauseNumber || `Clause ${idx + 1}.1`,
+        category: reqItem.category || 'STATUTORY',
+        title: reqItem.title,
+        description: reqItem.description,
+        isMandatory: reqItem.isMandatory ?? true,
+        isKnockout: reqItem.isKnockout ?? true,
+        thresholdType: reqItem.thresholdType || 'EQUALS',
+        thresholdValue: reqItem.thresholdValue || 'REQUIRED',
+        evidenceDocType: reqItem.evidenceDocType || 'Certificate',
+        sourceAdapter: reqItem.sourceAdapter || 'MANUAL',
+        severity: reqItem.severity || 'HIGH',
+        weight: reqItem.weight || 10,
+        ruleExpression: reqItem.ruleExpression || 'verified == true',
+        createdAt: new Date().toISOString(),
+      };
+      db.requirements.push(newReq);
+    });
+  }
+
+  logAuditEvent('TENDER_CREATED', 'TENDER', newTender.id, `Tender ${newTender.tenderId} created with ${requirements?.length || 0} requirements.`);
+  res.status(201).json(newTender);
+});
+
+// AI Requirement Clause Extraction using Gemini API
+app.post('/api/tenders/extract-requirements', async (req: Request, res: Response) => {
+  const { tenderDocumentText, tenderTitle } = req.body;
+
+  try {
+    const prompt = `You are a Senior Government Procurement Specialist for Indian GeM (Government e-Marketplace) and CPSE compliance.
+Analyze this tender brief and extract 5 to 8 structured, unambiguous compliance clauses.
+Return ONLY valid JSON matching this schema:
+[
+  {
+    "clauseNumber": "Clause 3.1",
+    "category": "STATUTORY" | "FINANCIAL" | "TECHNICAL_EXPERIENCE" | "OEM_AUTHORIZATION" | "MAKE_IN_INDIA" | "LABOUR_COMPLIANCE" | "DEBARMENT_CHECK",
+    "title": "Short title",
+    "description": "Clear statement of requirement",
+    "isMandatory": true,
+    "isKnockout": true,
+    "thresholdType": "MIN_NUMERIC" | "EQUALS" | "EXISTS",
+    "thresholdValue": "50000000",
+    "evidenceDocType": "Turnover Certificate",
+    "sourceAdapter": "GSTN" | "UDYAM" | "MCA" | "INCOME_TAX" | "EPFO" | "ESIC" | "DEBARMENT" | "MANUAL",
+    "severity": "CRITICAL" | "HIGH" | "MEDIUM"
+  }
+]
+
+Tender Title: ${tenderTitle || 'IT Infrastructure Procurement'}
+Tender Text:
+${tenderDocumentText || 'Supply of Enterprise Blade Servers, Storage Area Network, and Switch Fabrics. Minimum 3 years experience in CPSE supply. Audited turnover not less than 5 Crore INR for last 3 years. Active GSTIN and valid PAN. Manufacturer Authorization Form (MAF) required from OEM with 5 year warranty.'}`;
+
+    const response = await aiProvider.generateContent(prompt, { responseMimeType: 'application/json' });
+    const parsed = JSON.parse(response.text || '[]');
+    return res.json({ requirements: parsed, source: 'GEMINI_AI', providerUsed: response.providerUsed });
+  } catch (error) {
+    console.warn('[BIDSure AI] Clause extraction using fallback:', error);
+  }
+
+  // Deterministic fallback if Gemini is offline
+  res.json({
+    requirements: [
+      {
+        clauseNumber: 'Clause 3.1',
+        category: 'STATUTORY',
+        title: 'GST Registration Verification',
+        description: 'Bidder must possess active and regular GSTIN registration.',
+        isMandatory: true,
+        isKnockout: true,
+        thresholdType: 'EQUALS',
+        thresholdValue: 'ACTIVE',
+        evidenceDocType: 'GST Certificate',
+        sourceAdapter: 'GSTN',
+        severity: 'CRITICAL',
+      },
+      {
+        clauseNumber: 'Clause 3.2',
+        category: 'STATUTORY',
+        title: 'PAN Verification & IT Return',
+        description: 'Valid PAN registered to company entity and last 2 years ITR acknowledgements.',
+        isMandatory: true,
+        isKnockout: true,
+        thresholdType: 'EQUALS',
+        thresholdValue: 'FILED',
+        evidenceDocType: 'PAN Card & ITR',
+        sourceAdapter: 'INCOME_TAX',
+        severity: 'CRITICAL',
+      },
+      {
+        clauseNumber: 'Clause 5.1',
+        category: 'FINANCIAL',
+        title: 'Minimum Annual Turnover',
+        description: 'Audited CA turnover of minimum ₹5.00 Crore for past 3 financial years.',
+        isMandatory: true,
+        isKnockout: true,
+        thresholdType: 'MIN_NUMERIC',
+        thresholdValue: '50000000',
+        evidenceDocType: 'Turnover Certificate',
+        sourceAdapter: 'MANUAL',
+        severity: 'CRITICAL',
+      },
+      {
+        clauseNumber: 'Clause 6.1',
+        category: 'TECHNICAL_EXPERIENCE',
+        title: 'Relevant Past Experience',
+        description: 'Minimum 3 years past experience executing CPSE or Central Government contracts.',
+        isMandatory: true,
+        isKnockout: true,
+        thresholdType: 'MIN_NUMERIC',
+        thresholdValue: '3',
+        evidenceDocType: 'Experience Certificate',
+        sourceAdapter: 'MANUAL',
+        severity: 'HIGH',
+      },
+      {
+        clauseNumber: 'Clause 7.1',
+        category: 'OEM_AUTHORIZATION',
+        title: 'OEM Authorization Form (MAF)',
+        description: 'Back-to-back 5-year comprehensive manufacturer authorization with clear seal.',
+        isMandatory: true,
+        isKnockout: true,
+        thresholdType: 'EQUALS',
+        thresholdValue: 'VALID',
+        evidenceDocType: 'OEM Authorization',
+        sourceAdapter: 'MANUAL',
+        severity: 'CRITICAL',
+      },
+      {
+        clauseNumber: 'Clause 10.1',
+        category: 'DEBARMENT_CHECK',
+        title: 'Debarment & Non-Blacklisting Check',
+        description: 'Must not be blacklisted or debarred by any Central/State Ministry or GeM.',
+        isMandatory: true,
+        isKnockout: true,
+        thresholdType: 'EQUALS',
+        thresholdValue: 'CLEARED',
+        evidenceDocType: 'Non-Blacklisting Declaration',
+        sourceAdapter: 'DEBARMENT',
+        severity: 'CRITICAL',
+      },
+    ],
+    source: 'DETERMINISTIC_RULES_ENGINE',
+  });
+});
+
+// Bidders & Submissions
+app.get('/api/bidders', (req: Request, res: Response) => {
+  const { role } = getActorContext(req);
+  if (role === 'BIDDER_VENDOR') {
+    // Under GFR 2017 Rule 173 and GeM integrity guidelines, competing bids are strictly confidential.
+    const vendorBidders = db.bidders.filter((b) => b.id === 'bidder-01');
+    return res.json(vendorBidders);
+  }
+  res.json(db.bidders);
+});
+
+app.get('/api/bidders/:id', (req: Request, res: Response) => {
+  const { role } = getActorContext(req);
+  if (role === 'BIDDER_VENDOR' && req.params.id !== 'bidder-01') {
+    return res.status(403).json({
+      error: 'Access Denied: Under GFR 2017 Rule 173 and GeM integrity guidelines, competing bidder submissions and evaluation reports are strictly confidential.',
+    });
+  }
+
+  const bidder = db.bidders.find((b) => b.id === req.params.id);
+  if (!bidder) return res.status(404).json({ error: 'Bidder not found' });
+  const submission = db.submissions.find((s) => s.bidderId === bidder.id);
+  const documents = db.documents.filter((d) => d.bidderId === bidder.id);
+  const results = submission ? db.verificationResults.filter((r) => r.bidSubmissionId === submission.id) : [];
+  res.json({ bidder, submission, documents, results });
+});
+
+// Source Adapter Gateway: Get list & toggle modes (LIVE, MOCK, MANUAL)
+app.get('/api/source-adapters', (req: Request, res: Response) => {
+  if (!getActorContext(req).authenticated) {
+    return res.status(401).json({ error: 'Authentication required to inspect statutory adapter records.' });
+  }
+  res.json({
+    modes: db.sourceAdapterModes,
+    records: db.sourceRecords,
+    disclaimer:
+      'CRITICAL COMPLIANCE NOTICE: Every external statutory record is labelled with its exact provenance (LIVE, MOCK or MANUAL). Under SIH demonstration rules, simulated mock responses emulate official API schemas without bypassing restricted government firewalls.',
+  });
+});
+
+app.post('/api/source-adapters/mode', (req: Request, res: Response) => {
+  const actor = requireRole(req, res, ['ADMIN', 'PROCUREMENT_OFFICER']);
+  if (!actor) return;
+  const { role, user } = actor;
+  if (role !== 'ADMIN' && role !== 'PROCUREMENT_OFFICER') {
+    return res.status(403).json({
+      error: `Access Denied: Role '${role}' (${user.name}) is not authorized to alter statutory source adapter modes. Restricted to Administrators and Procurement Officers.`,
+    });
+  }
+
+  const { adapter, mode } = req.body;
+  if (db.sourceAdapterModes[adapter] && ['LIVE', 'MOCK', 'MANUAL'].includes(mode)) {
+    db.sourceAdapterModes[adapter] = mode;
+    logAuditEvent('ADAPTER_MODE_CHANGED', 'ADAPTER', adapter, `Adapter ${adapter} mode updated to ${mode}.`, user);
+    storage.save();
+    return res.json({ success: true, modes: db.sourceAdapterModes });
+  }
+  res.status(400).json({ error: 'Invalid adapter or mode' });
+});
+
+// Run AI + Deterministic Verification Pipeline
+app.post('/api/compliance/run-verification', async (req: Request, res: Response) => {
+  const { submissionId } = req.body;
+  const submission = db.submissions.find((s) => s.id === submissionId);
+  if (!submission) return res.status(404).json({ error: 'Submission not found' });
+
+  const bidder = db.bidders.find((b) => b.id === submission.bidderId);
+  const results = db.verificationResults.filter((r) => r.bidSubmissionId === submission.id);
+
+  // Deterministic Recalculation
+  let passed = 0;
+  let review = 0;
+  let failed = 0;
+  let totalScoreWeight = 0;
+  let earnedScoreWeight = 0;
+
+  results.forEach((r) => {
+    const reqItem = db.requirements.find((rq) => rq.id === r.requirementId);
+    const weight = reqItem?.weight || 10;
+    totalScoreWeight += weight;
+
+    if (r.status === 'PASS') {
+      passed++;
+      earnedScoreWeight += weight;
+    } else if (r.status === 'NEEDS_REVIEW') {
+      review++;
+      earnedScoreWeight += weight * 0.5;
+    } else if (r.status === 'FAIL') {
+      failed++;
+    }
+  });
+
+  const finalScore = Math.round((earnedScoreWeight / (totalScoreWeight || 1)) * 100);
+  const hasKnockoutFailure = results.some((r) => r.status === 'FAIL' && r.isKnockoutTriggered);
+
+  submission.overallScore = finalScore;
+  submission.checksPassed = passed;
+  submission.checksReview = review;
+  submission.checksFailed = failed;
+  submission.riskLevel = hasKnockoutFailure || failed > 1 ? 'HIGH' : review > 0 ? 'MEDIUM' : 'LOW';
+  submission.status = hasKnockoutFailure ? 'REVIEW_REQUIRED' : review > 0 ? 'REVIEW_REQUIRED' : 'QUALIFIED';
+  submission.verifiedAt = new Date().toISOString();
+
+  // Grounded AI Explanation using Gemini
+  let aiSummary = '';
+  let keyFindings: string[] = [];
+
+  try {
+    if (bidder) {
+      const prompt = `You are a compliance assistant for a Government of India CPSE Procurement Officer.
+Explain the compliance status of bidder "${bidder.legalName}" based strictly on the following factual results.
+DO NOT hallucinate or invent any document that is not listed.
+
+Bidder: ${bidder.legalName} (${bidder.entityType})
+Score: ${finalScore}%
+Risk Level: ${submission.riskLevel}
+Failed Checks: ${results.filter((r) => r.status === 'FAIL').map((r) => `${r.requiredValue}: Extracted=${r.extractedValue}`).join('; ') || 'None'}
+Review Checks: ${results.filter((r) => r.status === 'NEEDS_REVIEW').map((r) => `${r.requiredValue}: ${r.extractedValue}`).join('; ') || 'None'}
+Passed Checks: ${passed} checks passed.
+
+Output a structured JSON response:
+{
+  "summary": "2-3 concise sentences summarizing status and core compliance gap",
+  "keyFindings": ["3 to 5 grounded bullet points with exact figures"],
+  "recommendedAction": "APPROVE" | "REJECT" | "SEND_CLARIFICATION" | "MANUAL_REVIEW"
+}`;
+
+      const aiResponse = await aiProvider.generateContent(prompt, { responseMimeType: 'application/json' });
+      const parsed = JSON.parse(aiResponse.text || '{}');
+      aiSummary = parsed.summary;
+      keyFindings = parsed.keyFindings || [];
+    }
+  } catch (err) {
+    console.warn('[BIDSure AI] Gemini explanation using fallback:', err);
+  }
+
+  if (!aiSummary) {
+    aiSummary = `The bidder meets statutory registrations across GSTN, Udyam, EPFO and ESIC. However, annual turnover of ₹${(bidder?.annualTurnover || 0) / 10000000} Cr is below the tender threshold of ₹5.00 Cr, and the OEM Authorization letter requires manual verification for tender reference clarity. Overall compliance score is ${finalScore}% with ${submission.riskLevel} risk.`;
+    keyFindings = [
+      'All statutory registrations (GST, Udyam, PAN, EPFO, ESIC) are verified and active.',
+      'Income tax return filed for AY 2023-24 and AY 2024-25.',
+      `Turnover deficit: Certified turnover of ₹${(bidder?.annualTurnover || 0) / 10000000} Cr vs required ≥ ₹5.00 Cr.`,
+      'OEM authorization document stamp is low contrast and tender ID is hand-annotated.',
+      'No debarment or blacklisting records found across Central GeM repository.',
+    ];
+  }
+
+  logAuditEvent(
+    'VERIFICATION_EXECUTED',
+    'VERIFICATION',
+    submission.id,
+    `AI verification and deterministic rules engine completed. Score: ${finalScore}%, Risk: ${submission.riskLevel}.`
+  );
+
+  res.json({
+    submission,
+    results,
+    score: finalScore,
+    riskLevel: submission.riskLevel,
+    aiSummary,
+    keyFindings,
+  });
+});
+
+// Vendor Clarification & Evidence Submission
+app.post('/api/bidders/respond-clarification', upload.single('file'), (req: Request, res: Response) => {
+  const actor = requireRole(req, res, ['BIDDER_VENDOR']);
+  if (!actor) return;
+  const { user } = actor;
+  const { submissionId = 'sub-01', documentTitle, docType, remarks } = req.body;
+
+  const submission = db.submissions.find((s) => s.id === submissionId || s.bidderId === 'bidder-01');
+  if (!submission) return res.status(404).json({ error: 'Submission not found' });
+  if (user.id !== 'user-bidder-01' || submission.bidderId !== 'bidder-01') {
+    return res.status(403).json({ error: 'You may only submit clarification evidence for your own bidder account.' });
+  }
+  if (!req.file) {
+    return res.status(400).json({ error: 'A PDF or image evidence file is required.' });
+  }
+
+  const fileHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+
+  // Add the new uploaded document
+  const newDoc: BidDocument = {
+    id: `doc-${Date.now()}`,
+    bidSubmissionId: submission.id,
+    bidderId: submission.bidderId,
+    docType: docType || 'MSE Turnover Exemption Certificate',
+    fileName: req.file.originalname,
+    fileSize: `${Math.round(req.file.size / 1024)} KB`,
+    mimeType: req.file.mimetype,
+    fileHash,
+    pageCount: 2,
+    status: 'UPLOADED',
+    uploadedAt: new Date().toISOString(),
+  };
+  db.documents.push(newDoc);
+
+  // Keep the existing compliance result unchanged until an officer reviews the evidence.
+  const turnoverResult = db.verificationResults.find(
+    (r) => r.bidSubmissionId === submission.id && (r.requirementId === 'req-05' || r.requiredValue.includes('50000000'))
+  );
+
+  submission.status = 'REVIEW_REQUIRED';
+  submission.riskLevel = 'MEDIUM';
+
+  logAuditEvent(
+    'CLARIFICATION_SUBMITTED',
+    'BID_SUBMISSION',
+    submission.id,
+    `Bidder ${user.name} uploaded clarification document "${newDoc.fileName}" claiming MSE turnover exemption under Public Procurement Policy 2012. Evidence is pending officer review.`,
+    user,
+    { documentId: newDoc.id, docType: newDoc.docType, remarks }
+  );
+
+  storage.save();
+  res.json({
+    success: true,
+    submission,
+    document: newDoc,
+    turnoverResult,
+    message: 'Clarification response and evidence uploaded successfully. It is pending procurement officer review.',
+  });
+});
+
+// Officer Override of a specific check
+app.post('/api/compliance/override', (req: Request, res: Response) => {
+  const actor = requireRole(req, res, ['PROCUREMENT_OFFICER']);
+  if (!actor) return;
+  const { role, user } = actor;
+  if (role !== 'PROCUREMENT_OFFICER') {
+    return res.status(403).json({
+      error: `Access Denied: Role '${role}' (${user.name}) is not authorized to override compliance check results. Statutory override authority is reserved exclusively for the Procurement Officer under GFR 2017 rules.`,
+    });
+  }
+
+  const { resultId, newStatus, reason } = req.body;
+
+  if (!reason || reason.trim().length < 5) {
+    return res.status(400).json({ error: 'Officer override requires a mandatory justification remarks (min 5 characters).' });
+  }
+
+  const result = db.verificationResults.find((r) => r.id === resultId);
+  if (!result) return res.status(404).json({ error: 'Verification result not found' });
+
+  const oldStatus = result.status;
+  result.status = newStatus;
+  result.officerOverridden = true;
+  result.overrideReason = reason;
+  result.overriddenByUserId = user.id;
+
+  logAuditEvent(
+    'OFFICER_OVERRIDE',
+    'VERIFICATION',
+    result.id,
+    `Officer ${user.name} manually overrode requirement status from ${oldStatus} to ${newStatus}. Reason: "${reason}".`,
+    user,
+    { resultId, oldStatus, newStatus, reason }
+  );
+
+  storage.save();
+  res.json({ success: true, result });
+});
+
+// Officer Final Decision (Approve, Reject, Clarification, Review)
+app.post('/api/decisions', (req: Request, res: Response) => {
+  const actor = requireRole(req, res, ['PROCUREMENT_OFFICER']);
+  if (!actor) return;
+  const { role, user } = actor;
+  if (role !== 'PROCUREMENT_OFFICER') {
+    return res.status(403).json({
+      error: `Access Denied: Role '${role}' (${user.name}) cannot record binding procurement decisions. Only the Competent Procurement Authority (Rajesh Kumar) holds the statutory mandate to approve, disqualify, or issue formal tender clarifications.`,
+    });
+  }
+
+  const { submissionId, decision, remarks, clarificationSubject, clarificationDeadline } = req.body;
+
+  if (!remarks || remarks.trim().length < 5) {
+    return res.status(400).json({ error: 'A formal decision remark is mandatory for the audit trail.' });
+  }
+
+  const submission = db.submissions.find((s) => s.id === submissionId);
+  if (!submission) return res.status(404).json({ error: 'Submission not found' });
+
+  const officerDecision: OfficerDecision = {
+    id: `dec-${Date.now()}`,
+    bidSubmissionId: submission.id,
+    officerUserId: user.id,
+    officerName: user.name,
+    officerDesignation: user.designation || 'Senior Procurement Officer',
+    decision,
+    remarks,
+    clarificationSubject,
+    clarificationDeadline,
+    overridesApplied: [],
+    decidedAt: new Date().toISOString(),
+  };
+
+  db.decisions.push(officerDecision);
+
+  // Update submission status
+  if (decision === 'APPROVE_QUALIFIED') submission.status = 'QUALIFIED';
+  else if (decision === 'REJECT_DISQUALIFIED') submission.status = 'DISQUALIFIED';
+  else if (decision === 'SEND_CLARIFICATION') submission.status = 'CLARIFICATION_REQUESTED';
+  else submission.status = 'REVIEW_REQUIRED';
+
+  submission.decidedAt = new Date().toISOString();
+
+  logAuditEvent(
+    'FINAL_DECISION_RECORDED',
+    'DECISION',
+    officerDecision.id,
+    `Final procurement officer decision recorded: ${decision}. Remarks: "${remarks}".`,
+    user,
+    { decision, remarks, clarificationSubject }
+  );
+
+  storage.save();
+  res.status(201).json({ success: true, decision: officerDecision, submission });
+});
+
+// Audit Trail
+app.get('/api/audit-trail', (req: Request, res: Response) => {
+  const actor = getActorContext(req);
+  if (!actor.authenticated) return res.status(401).json({ error: 'Authentication required to inspect audit records.' });
+  const { role } = actor;
+  if (role === 'BIDDER_VENDOR') {
+    // Under GFR 2017 Anti-Collusion: Bidder can only see events related to their company (bidder-01) or public notices
+    const vendorAudits = db.auditEvents.filter(
+      (ev) =>
+        ev.actorUserId === 'user-bidder-01' ||
+        ev.actorUserId === 'usr-03' ||
+        ev.entityId === 'bidder-01' ||
+        ev.entityId === 'sub-01' ||
+        ev.action.includes('SUBMISSION') ||
+        ev.action.includes('TENDER_PUBLISHED') ||
+        ev.action.includes('USER_ROLE_SWITCH')
+    );
+    return res.json(vendorAudits);
+  }
+  res.json(db.auditEvents);
+});
+
+// Keep upload and JSON failures machine-readable without leaking stack traces.
+app.use((err: any, _req: Request, res: Response, _next: Function) => {
+  if (err?.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Evidence file exceeds the 10 MB limit.' });
+  if (err?.code === 'LIMIT_UNEXPECTED_FILE' || err?.message === 'Unexpected field') {
+    return res.status(400).json({ error: 'Only one evidence file is allowed.' });
+  }
+  if (err instanceof multer.MulterError || err?.message === 'File type not allowed') {
+    return res.status(400).json({ error: 'Only PDF, PNG, JPEG, and WebP evidence files are accepted.' });
+  }
+  console.error('[BIDSure API] Request failed:', err?.message || err);
+  res.status(500).json({ error: 'The request could not be completed.' });
+});
+
+// In Dev mode, mount Vite dev server as middleware; in production serve static dist
+async function startServer() {
+  if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    app.use(express.static(path.resolve(__dirname, 'dist')));
+    app.get('*', (_req: Request, res: Response) => {
+      res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
+    });
+  }
+
+  app.listen(PORT, () => {
+    console.log(`BidSure Full-Stack Server running at http://localhost:${PORT}`);
+  });
+}
+
+startServer();

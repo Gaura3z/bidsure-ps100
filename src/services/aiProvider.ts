@@ -261,7 +261,7 @@ class ResilientAIProvider {
 
       return {
         configured: true,
-        model: this.model,
+        model: res.providerUsed.startsWith('OPENAI') ? this.openAIModel : this.model,
         activeProvider: res.providerUsed,
         primaryConfigured: Boolean(primarySlot),
         secondaryConfigured: Boolean(secondarySlot),
@@ -296,9 +296,10 @@ class ResilientAIProvider {
     const primarySlot = this.providers.find((p) => p.kind === 'OPENAI');
     const secondarySlot = this.providers.find((p) => p.label === 'SECONDARY');
     const configured = this.providers.length > 0;
+    const activeSlot = this.providers[this.activeIndex];
     return {
       configured,
-      model: this.model,
+      model: activeSlot?.model || this.model,
       activeProvider: configured ? this.providers[this.activeIndex]?.label || 'OPENAI' : 'NONE',
       primaryConfigured: Boolean(primarySlot),
       secondaryConfigured: Boolean(secondarySlot),

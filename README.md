@@ -20,6 +20,7 @@ The current branch is a safe demo baseline. It uses an atomic JSON store and exp
 
 See [production readiness](docs/PRODUCTION_READINESS.md) and the [Google AI Studio master prompt](docs/GOOGLE_AI_STUDIO_MASTER_PROMPT.md) before asking an AI coding agent to extend the project.
 For the PostgreSQL setup, see [Supabase setup](docs/SUPABASE_SETUP.md).
+For deployment, see [deployment](docs/DEPLOYMENT.md).
 
 ## Run Locally
 

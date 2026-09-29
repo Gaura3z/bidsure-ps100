@@ -7,6 +7,7 @@ import multer from 'multer';
 import { storage } from './src/db/storage.ts';
 import { aiProvider } from './src/services/aiProvider.ts';
 import { storeDocument } from './src/services/documentStorage.ts';
+import { extractTextWithLocalOcr, scanForMalware } from './src/services/documentPipeline.ts';
 import {
   Tender,
   TenderRequirement,
@@ -628,6 +629,12 @@ app.post('/api/bidders/respond-clarification', upload.single('file'), async (req
     return res.status(503).json({ error: error?.message || 'Document storage is unavailable.' });
   }
 
+  const malware = await scanForMalware(req.file.buffer);
+  if (malware.status === 'INFECTED') {
+    return res.status(422).json({ error: 'The uploaded document failed malware scanning.', scanEngine: malware.engine });
+  }
+  const ocr = await extractTextWithLocalOcr({ buffer: req.file.buffer, mimeType: req.file.mimetype, documentId });
+
   // Add the uploaded document metadata after durable storage succeeds.
   const newDoc: BidDocument = {
     id: documentId,
@@ -639,6 +646,11 @@ app.post('/api/bidders/respond-clarification', upload.single('file'), async (req
     mimeType: req.file.mimetype,
     fileHash,
     storagePath: stored.storagePath,
+    securityStatus: malware.status,
+    securityEngine: malware.engine,
+    ocrStatus: ocr.status === 'CLEAN' ? 'COMPLETE' : ocr.status,
+    ocrEngine: ocr.engine,
+    ocrText: 'text' in ocr && typeof ocr.text === 'string' ? ocr.text.slice(0, 100000) : undefined,
     pageCount: 2,
     status: 'UPLOADED',
     uploadedAt: new Date().toISOString(),

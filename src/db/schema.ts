@@ -110,6 +110,11 @@ export interface BidDocument {
   fileHash: string; // SHA-256 for audit integrity
   storagePath?: string;
   status: 'UPLOADED' | 'EXTRACTED' | 'VERIFIED' | 'FLAGGED' | 'EXPIRED';
+  securityStatus?: 'CLEAN' | 'INFECTED' | 'PENDING' | 'NOT_CONFIGURED' | 'FAILED';
+  securityEngine?: string;
+  ocrStatus?: 'COMPLETE' | 'PENDING' | 'NOT_CONFIGURED' | 'FAILED';
+  ocrEngine?: string;
+  ocrText?: string;
   uploadedAt: string;
   previewUrl?: string;
   pageCount: number;

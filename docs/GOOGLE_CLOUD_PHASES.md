@@ -1,5 +1,7 @@
 # Google Cloud implementation phases
 
+Google Cloud is optional. The active implementation uses Supabase plus local OCR and malware scanning because the Google Cloud billing account could not be created.
+
 ## Phase 1: foundation and adapters
 
 Implemented now:

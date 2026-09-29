@@ -14,6 +14,7 @@ The current branch is a safe demo baseline. It uses an atomic JSON store and exp
 - Server-side session cookie authorization is enabled for demo personas.
 - Multipart PDF/image upload, size/MIME checks, and SHA-256 hashing are implemented.
 - Gemini integration has server-only keys, model configuration, timeout, and deterministic fallback.
+- Tesseract and ClamAV adapters are available with safe `NOT_CONFIGURED` states; Google Vision is optional.
 - PostgreSQL schema/migrations are prepared, but the runtime still uses the JSON demo store until Supabase is connected and verified.
 - Managed object storage, production SSO, OCR/malware scanning, and official government adapters remain deployment-phase work.
 

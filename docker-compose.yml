@@ -17,5 +17,15 @@ services:
       timeout: 5s
       retries: 5
 
+  clamav:
+    image: clamav/clamav:stable
+    container_name: bidsure_clamav
+    restart: unless-stopped
+    ports:
+      - "3310:3310"
+    volumes:
+      - clamav_db:/var/lib/clamav
+
 volumes:
   bidsure_pgdata:
+  clamav_db:

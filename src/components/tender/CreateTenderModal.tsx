@@ -236,9 +236,9 @@ export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
             <div className="p-4 border-2 border-dashed border-blue-200 rounded-xl bg-blue-50/40 text-center">
               <UploadCloud className="w-8 h-8 text-blue-600 mx-auto mb-1" />
               <div className="font-semibold text-slate-800">
-                CPCL_IT_Tender_2026_089.pdf (Simulated Upload)
+                CPCL_IT_Tender_2026_089.pdf · Demo package loaded
               </div>
-              <p className="text-[11px] text-slate-500">12.4 MB · GeM Standard Bid Document v4.0</p>
+              <p className="text-[11px] text-slate-500">Tender scope text is ready for AI requirement extraction · GeM Standard Bid Document v4.0</p>
             </div>
 
             <div className="pt-3 flex items-center justify-between">

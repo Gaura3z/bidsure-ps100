@@ -82,6 +82,17 @@ export default function App() {
 
   const [roleToast, setRoleToast] = useState<{ role: string; name: string; title: string; desc: string } | null>(null);
 
+  const roleCanUseTab = (tab: ActiveTab) => {
+    if (tab === 'SOURCE_GATEWAY') {
+      return ['PROCUREMENT_OFFICER', 'COMPLIANCE_ANALYST', 'ADMIN'].includes(currentUser.role);
+    }
+    return true;
+  };
+
+  useEffect(() => {
+    if (!roleCanUseTab(activeTab)) setActiveTab('DASHBOARD');
+  }, [activeTab, currentUser.role]);
+
   // Load live data from API if server is running
   useEffect(() => {
     async function loadInitialData() {
@@ -203,6 +214,7 @@ export default function App() {
 
   // Run AI & deterministic verification
   const handleRunVerification = async (submissionId: string) => {
+    if (!['PROCUREMENT_OFFICER', 'COMPLIANCE_ANALYST'].includes(currentUser.role)) return;
     try {
       const data = await runVerificationPipeline(submissionId);
       if (data?.submission) {
@@ -240,6 +252,7 @@ export default function App() {
 
   // Officer override of specific check
   const handleOverrideResult = async (resultId: string, newStatus: string, reason: string) => {
+    if (currentUser.role !== 'PROCUREMENT_OFFICER') return;
     try {
       await overrideVerificationResult(resultId, newStatus, reason);
 
@@ -294,6 +307,7 @@ export default function App() {
 
   // Final Decision confirmation
   const handleConfirmDecision = async (decisionData: any) => {
+    if (currentUser.role !== 'PROCUREMENT_OFFICER') return;
     try {
       await recordOfficerDecision(decisionData);
 

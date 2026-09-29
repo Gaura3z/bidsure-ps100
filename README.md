@@ -14,9 +14,11 @@ The current branch is a safe demo baseline. It uses an atomic JSON store and exp
 - Server-side session cookie authorization is enabled for demo personas.
 - Multipart PDF/image upload, size/MIME checks, and SHA-256 hashing are implemented.
 - Gemini integration has server-only keys, model configuration, timeout, and deterministic fallback.
-- PostgreSQL, managed object storage, production SSO, OCR/malware scanning, and official government adapters remain deployment-phase work.
+- PostgreSQL schema/migrations are prepared, but the runtime still uses the JSON demo store until Supabase is connected and verified.
+- Managed object storage, production SSO, OCR/malware scanning, and official government adapters remain deployment-phase work.
 
 See [production readiness](docs/PRODUCTION_READINESS.md) and the [Google AI Studio master prompt](docs/GOOGLE_AI_STUDIO_MASTER_PROMPT.md) before asking an AI coding agent to extend the project.
+For the PostgreSQL setup, see [Supabase setup](docs/SUPABASE_SETUP.md).
 
 ## Run Locally
 

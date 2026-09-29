@@ -21,6 +21,9 @@ import {
   User,
 } from './src/db/schema.ts';
 
+// Render secret files are mounted outside the working directory. Load them first
+// so production can keep AI/database credentials out of the image and repository.
+dotenv.config({ path: '/etc/secrets/.env' });
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);

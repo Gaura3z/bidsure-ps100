@@ -1,7 +1,7 @@
 /**
- * BIDSure - Resilient Multi-Key Gemini AI Provider with Instant Failover
+ * BIDSure - Resilient multi-provider AI engine with instant failover
  * Implements Section 8: API KEY FAILOVER SYSTEM
- * Primary Key -> Attempt -> Failover to Secondary Key -> Controlled Deterministic Fallback
+ * OpenAI -> Gemini primary/secondary -> Controlled Deterministic Fallback
  */
 
 import { GoogleGenAI } from '@google/genai';
@@ -10,10 +10,12 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export interface KeyProviderSlot {
-  label: 'PRIMARY' | 'SECONDARY' | 'LEGACY';
+  label: 'OPENAI' | 'PRIMARY' | 'SECONDARY' | 'LEGACY';
+  kind: 'OPENAI' | 'GEMINI';
   apiKey: string;
   masked: string;
-  client: GoogleGenAI;
+  client?: GoogleGenAI;
+  model: string;
   failureCount: number;
   lastUsedAt?: string;
   lastError?: string;
@@ -45,8 +47,20 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   });
 }
 
+function readOpenAIOutputText(payload: any): string {
+  if (typeof payload?.output_text === 'string') return payload.output_text;
+  const parts = Array.isArray(payload?.output)
+    ? payload.output.flatMap((item: any) => Array.isArray(item?.content) ? item.content : [])
+    : [];
+  return parts
+    .filter((part: any) => part?.type === 'output_text' && typeof part?.text === 'string')
+    .map((part: any) => part.text)
+    .join('\n');
+}
+
 class ResilientAIProvider {
   private model: string;
+  private openAIModel: string;
   private providers: KeyProviderSlot[] = [];
   private activeIndex: number = 0;
 
@@ -54,20 +68,35 @@ class ResilientAIProvider {
     // The supplied Gemini documentation uses the Interactions-era model name.
     // Keep it configurable so a deployment can pin another supported model.
     this.model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+    this.openAIModel = process.env.OPENAI_MODEL || 'gpt-6-luna';
     this.initProviders();
   }
 
   public initProviders() {
     this.providers = [];
+    const openAI = process.env.OPENAI_API_KEY?.trim();
     const primary = process.env.PRIMARY_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim() || process.env.GOOGLE_API_KEY?.trim();
     const secondary = process.env.SECONDARY_API_KEY?.trim();
     const legacy = process.env.GEMINI_API_KEY?.trim() || process.env.GOOGLE_API_KEY?.trim();
 
+    if (openAI) {
+      this.providers.push({
+        label: 'OPENAI',
+        kind: 'OPENAI',
+        apiKey: openAI,
+        masked: maskKey(openAI),
+        model: this.openAIModel,
+        failureCount: 0,
+      });
+    }
+
     if (primary) {
       this.providers.push({
         label: 'PRIMARY',
+        kind: 'GEMINI',
         apiKey: primary,
         masked: maskKey(primary),
+        model: this.model,
         client: new GoogleGenAI({
           apiKey: primary,
           httpOptions: { headers: { 'User-Agent': 'bidsure-compliance-engine-p1' } },
@@ -79,8 +108,10 @@ class ResilientAIProvider {
     if (secondary && secondary !== primary) {
       this.providers.push({
         label: 'SECONDARY',
+        kind: 'GEMINI',
         apiKey: secondary,
         masked: maskKey(secondary),
+        model: this.model,
         client: new GoogleGenAI({
           apiKey: secondary,
           httpOptions: { headers: { 'User-Agent': 'bidsure-compliance-engine-p2' } },
@@ -90,8 +121,10 @@ class ResilientAIProvider {
     } else if (legacy && legacy !== primary && legacy !== secondary) {
       this.providers.push({
         label: 'LEGACY',
+        kind: 'GEMINI',
         apiKey: legacy,
         masked: maskKey(legacy),
+        model: this.model,
         client: new GoogleGenAI({
           apiKey: legacy,
           httpOptions: { headers: { 'User-Agent': 'bidsure-compliance-engine-legacy' } },
@@ -107,7 +140,7 @@ class ResilientAIProvider {
     forceFailPrimary: boolean = false
   ): Promise<{ text: string; providerUsed: string; failoverOccurred: boolean }> {
     if (this.providers.length === 0) {
-      throw new Error('NO_KEYS_CONFIGURED: No Gemini API keys found in environment.');
+      throw new Error('NO_KEYS_CONFIGURED: No OpenAI or Gemini API keys found in environment.');
     }
 
     let failoverOccurred = false;
@@ -125,6 +158,34 @@ class ResilientAIProvider {
       }
 
       try {
+        if (slot.kind === 'OPENAI') {
+          const response = await withTimeout(fetch('https://api.openai.com/v1/responses', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${slot.apiKey}`,
+            },
+            body: JSON.stringify({
+              model: slot.model,
+              input: contents,
+              store: false,
+            }),
+          }), 15000);
+          const payload: any = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            const error: any = new Error(payload?.error?.message || `OpenAI request failed (${response.status})`);
+            error.status = response.status;
+            throw error;
+          }
+          slot.lastUsedAt = new Date().toISOString();
+          this.activeIndex = i;
+          return {
+            text: readOpenAIOutputText(payload),
+            providerUsed: slot.label,
+            failoverOccurred: i > 0,
+          };
+        }
+
         // Authorization keys documented by Google AI Studio use the Interactions API.
         // Map the small provider config used by the app to the SDK's interaction fields.
         const interactionParams: Record<string, unknown> = {
@@ -137,7 +198,7 @@ class ResilientAIProvider {
             mime_type: config.responseMimeType,
           }];
         }
-        const response = await withTimeout(slot.client.interactions.create(interactionParams as any), 15000);
+        const response = await withTimeout(slot.client!.interactions.create(interactionParams as any), 15000);
 
         slot.lastUsedAt = new Date().toISOString();
         this.activeIndex = i;
@@ -169,13 +230,13 @@ class ResilientAIProvider {
   }
 
   public async checkHealth(): Promise<ProviderDiagnostic> {
-    const primarySlot = this.providers.find((p) => p.label === 'PRIMARY');
+    const primarySlot = this.providers.find((p) => p.label === 'OPENAI');
     const secondarySlot = this.providers.find((p) => p.label === 'SECONDARY');
 
     if (this.providers.length === 0) {
       return {
         configured: false,
-        model: this.model,
+        model: this.openAIModel,
         activeProvider: 'NONE',
         primaryConfigured: false,
         secondaryConfigured: false,
@@ -183,7 +244,7 @@ class ResilientAIProvider {
         secondaryMasked: null,
         failoverReady: false,
         mode: 'DETERMINISTIC_GROUNDED_FALLBACK',
-        message: 'No Gemini provider key configured. Platform is running in 100% deterministic rule verification mode.',
+        message: 'No OpenAI or Gemini provider key configured. Platform is running in 100% deterministic rule verification mode.',
       };
     }
 
@@ -205,7 +266,7 @@ class ResilientAIProvider {
         failoverReady: this.providers.length > 1,
         mode: res.failoverOccurred ? 'FAILOVER_ACTIVE' : 'LIVE_GEMINI_AI',
         latencyMs: latency,
-        message: `Gemini is operational using ${res.providerUsed} key (${this.model}). Failover ready: ${this.providers.length > 1 ? 'YES' : 'NO'}.`,
+        message: `${res.providerUsed} is operational. Failover ready: ${this.providers.length > 1 ? 'YES' : 'NO'}.`,
       };
     } catch (err: any) {
       return {
@@ -218,7 +279,7 @@ class ResilientAIProvider {
         secondaryMasked: secondarySlot?.masked || null,
         failoverReady: this.providers.length > 1,
         mode: 'DETERMINISTIC_GROUNDED_FALLBACK',
-        message: 'Gemini providers currently unavailable. Deterministic compliance rule engine is active.',
+        message: 'Configured AI providers are currently unavailable. Deterministic compliance rule engine is active.',
       };
     }
   }
@@ -228,13 +289,13 @@ class ResilientAIProvider {
   }
 
   public getConfigurationSnapshot(): ProviderDiagnostic {
-    const primarySlot = this.providers.find((p) => p.label === 'PRIMARY');
+    const primarySlot = this.providers.find((p) => p.label === 'OPENAI');
     const secondarySlot = this.providers.find((p) => p.label === 'SECONDARY');
     const configured = this.providers.length > 0;
     return {
       configured,
       model: this.model,
-      activeProvider: configured ? this.providers[this.activeIndex]?.label || 'PRIMARY' : 'NONE',
+      activeProvider: configured ? this.providers[this.activeIndex]?.label || 'OPENAI' : 'NONE',
       primaryConfigured: Boolean(primarySlot),
       secondaryConfigured: Boolean(secondarySlot),
       primaryMasked: primarySlot?.masked || null,
@@ -242,8 +303,8 @@ class ResilientAIProvider {
       failoverReady: this.providers.length > 1,
       mode: configured ? 'LIVE_GEMINI_AI' : 'DETERMINISTIC_GROUNDED_FALLBACK',
       message: configured
-        ? `Gemini is configured with ${this.model}. Live availability is checked only when an AI operation runs.`
-        : 'No Gemini provider key configured. Deterministic compliance rules are active.',
+        ? `AI fallback chain is configured. Live availability is checked only when an AI operation runs.`
+        : 'No OpenAI or Gemini provider key configured. Deterministic compliance rules are active.',
     };
   }
 }

@@ -29,7 +29,10 @@ Keep `STORAGE_MODE=json` until the migration has been applied and verified.
 npm install
 npm run db:generate
 npm run db:migrate
+npm run db:seed
 ```
+
+The seed command is additive and skips rows whose IDs already exist. Use `npm run db:seed -- --replace` only when the Supabase project is a dedicated BidSure demo database and you intentionally want to replace its rows with the local clean seed.
 
 The migration creates 14 tables covering organizations, users, tenders, requirements, bidders, submissions, documents, extractions, source records, verification results, scores, recommendations, decisions, and audit events.
 

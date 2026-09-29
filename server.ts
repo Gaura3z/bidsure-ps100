@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import multer from 'multer';
 import { storage } from './src/db/storage.ts';
 import { aiProvider } from './src/services/aiProvider.ts';
+import { storeDocument } from './src/services/documentStorage.ts';
 import {
   Tender,
   TenderRequirement,
@@ -596,7 +597,7 @@ Output a structured JSON response:
 });
 
 // Vendor Clarification & Evidence Submission
-app.post('/api/bidders/respond-clarification', upload.single('file'), (req: Request, res: Response) => {
+app.post('/api/bidders/respond-clarification', upload.single('file'), async (req: Request, res: Response) => {
   const actor = requireRole(req, res, ['BIDDER_VENDOR']);
   if (!actor) return;
   const { user } = actor;
@@ -613,9 +614,23 @@ app.post('/api/bidders/respond-clarification', upload.single('file'), (req: Requ
 
   const fileHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
 
-  // Add the new uploaded document
+  const documentId = `doc-${Date.now()}`;
+  let stored;
+  try {
+    stored = await storeDocument({
+      submissionId: submission.id,
+      documentId,
+      fileName: req.file.originalname,
+      mimeType: req.file.mimetype,
+      buffer: req.file.buffer,
+    });
+  } catch (error: any) {
+    return res.status(503).json({ error: error?.message || 'Document storage is unavailable.' });
+  }
+
+  // Add the uploaded document metadata after durable storage succeeds.
   const newDoc: BidDocument = {
-    id: `doc-${Date.now()}`,
+    id: documentId,
     bidSubmissionId: submission.id,
     bidderId: submission.bidderId,
     docType: docType || 'MSE Turnover Exemption Certificate',
@@ -623,6 +638,7 @@ app.post('/api/bidders/respond-clarification', upload.single('file'), (req: Requ
     fileSize: `${Math.round(req.file.size / 1024)} KB`,
     mimeType: req.file.mimetype,
     fileHash,
+    storagePath: stored.storagePath,
     pageCount: 2,
     status: 'UPLOADED',
     uploadedAt: new Date().toISOString(),

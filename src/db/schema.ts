@@ -108,6 +108,7 @@ export interface BidDocument {
   fileSize: string;
   mimeType: string;
   fileHash: string; // SHA-256 for audit integrity
+  storagePath?: string;
   status: 'UPLOADED' | 'EXTRACTED' | 'VERIFIED' | 'FLAGGED' | 'EXPIRED';
   uploadedAt: string;
   previewUrl?: string;

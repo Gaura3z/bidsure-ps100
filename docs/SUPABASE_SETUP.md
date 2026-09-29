@@ -34,6 +34,21 @@ npm run db:seed
 
 The seed command is additive and skips rows whose IDs already exist. Use `npm run db:seed -- --replace` only when the Supabase project is a dedicated BidSure demo database and you intentionally want to replace its rows with the local clean seed.
 
+## 5. Enable durable document storage
+
+Create a **private** Storage bucket named `bid-documents` in Supabase Storage. Then configure locally:
+
+```env
+DOCUMENT_STORAGE=supabase
+SUPABASE_URL=https://iciwqzohovywsvgacsqq.supabase.co
+SUPABASE_STORAGE_BUCKET=bid-documents
+SUPABASE_SERVICE_ROLE_KEY=your_server_only_key
+```
+
+The service-role key must stay only in `.env` or a deployment secret manager. The server stores files under a submission-specific path and PostgreSQL stores the object path. The browser never receives the service-role key.
+
+If the service-role key is not configured, leave `DOCUMENT_STORAGE=local`; local files go under ignored `data/uploads/` for development.
+
 The migration creates 14 tables covering organizations, users, tenders, requirements, bidders, submissions, documents, extractions, source records, verification results, scores, recommendations, decisions, and audit events.
 
 ## 4. Verify in Supabase

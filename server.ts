@@ -571,6 +571,24 @@ app.post('/api/compliance/run-verification', async (req: Request, res: Response)
   submission.status = hasKnockoutFailure ? 'REVIEW_REQUIRED' : review > 0 ? 'REVIEW_REQUIRED' : 'QUALIFIED';
   submission.verifiedAt = new Date().toISOString();
 
+  const scoreRecord = {
+    id: `score-${submission.id}`,
+    bidSubmissionId: submission.id,
+    totalRequirements: results.length,
+    passedCount: passed,
+    reviewCount: review,
+    failedCount: failed,
+    weightedScore: finalScore,
+    riskScore: Math.max(0, 100 - finalScore),
+    riskLevel: submission.riskLevel,
+    scoringVersion: 'v2.4-2026',
+    calculatedAt: new Date().toISOString(),
+  } as any;
+  db.complianceScores = [
+    ...db.complianceScores.filter((score: any) => score.bidSubmissionId !== submission.id),
+    scoreRecord,
+  ];
+
   // Grounded AI Explanation using Gemini
   let aiSummary = '';
   let keyFindings: string[] = [];
@@ -615,12 +633,29 @@ Output a structured JSON response:
     ];
   }
 
+  const recommendationRecord = {
+    id: `ai-${submission.id}`,
+    bidSubmissionId: submission.id,
+    summary: aiSummary,
+    suggestedAction: submission.status === 'QUALIFIED' ? 'APPROVE' : failed > 0 ? 'MANUAL_REVIEW' : 'SEND_CLARIFICATION',
+    keyFindings: keyFindings.map((finding) => ({ type: 'WARNING', title: 'Compliance finding', description: finding })),
+    discrepancies: [],
+    riskFactors: [submission.riskLevel],
+    disclaimer: 'AI output is advisory. Final procurement decisions remain with the authorized officer.',
+    generatedAt: new Date().toISOString(),
+  } as any;
+  db.aiRecommendations = [
+    ...db.aiRecommendations.filter((recommendation: any) => recommendation.bidSubmissionId !== submission.id),
+    recommendationRecord,
+  ];
+
   logAuditEvent(
     'VERIFICATION_EXECUTED',
     'VERIFICATION',
     submission.id,
     `AI verification and deterministic rules engine completed. Score: ${finalScore}%, Risk: ${submission.riskLevel}.`
   );
+  storage.save();
 
   res.json({
     submission,

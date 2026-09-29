@@ -7,7 +7,7 @@ const sqlClient = postgres(process.env.DATABASE_URL!, { max: 5 });
 const db = drizzle(sqlClient);
 
 export async function loadPostgresState(): Promise<DatabaseState> {
-  const [organizationRows, users, tenders, requirements, bidders, submissions, documents, sourceRecords, adapterModeRows, verificationResults, decisions, auditEvents] = await Promise.all([
+  const [organizationRows, users, tenders, requirements, bidders, submissions, documents, extractions, sourceRecords, adapterModeRows, verificationResults, scores, recommendations, decisions, auditEvents] = await Promise.all([
     db.select().from(pgSchema.organizations),
     db.select().from(pgSchema.users),
     db.select().from(pgSchema.tenders),
@@ -15,9 +15,12 @@ export async function loadPostgresState(): Promise<DatabaseState> {
     db.select().from(pgSchema.bidders),
     db.select().from(pgSchema.bidSubmissions),
     db.select().from(pgSchema.bidDocuments),
+    db.select().from(pgSchema.documentExtractions),
     db.select().from(pgSchema.sourceRecords),
     db.select().from(pgSchema.sourceAdapterModes),
     db.select().from(pgSchema.verificationResults),
+    db.select().from(pgSchema.complianceScores),
+    db.select().from(pgSchema.aiRecommendations),
     db.select().from(pgSchema.officerDecisions),
     db.select().from(pgSchema.auditEvents),
   ]);
@@ -37,8 +40,11 @@ export async function loadPostgresState(): Promise<DatabaseState> {
     bidders: bidders as any,
     submissions: submissions as any,
     documents: documents as any,
+    documentExtractions: extractions as any,
     sourceRecords: sourceRecords as any,
     verificationResults: verificationResults as any,
+    complianceScores: scores as any,
+    aiRecommendations: recommendations as any,
     decisions: decisions as any,
     auditEvents: auditEvents as any,
     sourceAdapterModes: adapterModeRows.length ? Object.fromEntries(adapterModeRows.map((row) => [row.adapterName, row.mode])) as DatabaseState['sourceAdapterModes'] : {
@@ -72,6 +78,7 @@ export async function persistPostgresState(state: DatabaseState) {
     if (state.bidders.length) await tx.insert(pgSchema.bidders).values(state.bidders as any);
     if (state.submissions.length) await tx.insert(pgSchema.bidSubmissions).values(state.submissions as any);
     if (state.documents.length) await tx.insert(pgSchema.bidDocuments).values(state.documents.map((row) => ({ ...row, storagePath: (row as any).storagePath ?? null })) as any);
+    if (state.documentExtractions.length) await tx.insert(pgSchema.documentExtractions).values(state.documentExtractions as any);
     if (state.sourceRecords.length) await tx.insert(pgSchema.sourceRecords).values(state.sourceRecords as any);
     const adapterModeRows = Object.entries(state.sourceAdapterModes).map(([adapterName, mode]) => ({
       id: `${state.organization.id}:${adapterName}`,
@@ -82,6 +89,8 @@ export async function persistPostgresState(state: DatabaseState) {
     }));
     if (adapterModeRows.length) await tx.insert(pgSchema.sourceAdapterModes).values(adapterModeRows as any);
     if (state.verificationResults.length) await tx.insert(pgSchema.verificationResults).values(state.verificationResults as any);
+    if (state.complianceScores.length) await tx.insert(pgSchema.complianceScores).values(state.complianceScores as any);
+    if (state.aiRecommendations.length) await tx.insert(pgSchema.aiRecommendations).values(state.aiRecommendations as any);
     if (state.decisions.length) await tx.insert(pgSchema.officerDecisions).values(state.decisions.map((row) => ({ ...row, overridesApplied: row.overridesApplied ?? [] })) as any);
     if (state.auditEvents.length) await tx.insert(pgSchema.auditEvents).values(state.auditEvents as any);
   });

@@ -29,6 +29,9 @@ import {
   BidDocument,
   SourceRecord,
   VerificationResult,
+  DocumentExtraction,
+  ComplianceScore,
+  AIRecommendation,
   OfficerDecision,
   AuditEvent,
 } from './schema.ts';
@@ -50,8 +53,11 @@ export interface DatabaseState {
   bidders: Bidder[];
   submissions: BidSubmission[];
   documents: BidDocument[];
+  documentExtractions: DocumentExtraction[];
   sourceRecords: SourceRecord[];
   verificationResults: VerificationResult[];
+  complianceScores: ComplianceScore[];
+  aiRecommendations: AIRecommendation[];
   decisions: OfficerDecision[];
   auditEvents: AuditEvent[];
   sourceAdapterModes: Record<string, 'LIVE' | 'MOCK' | 'MANUAL'>;
@@ -69,8 +75,11 @@ function getDefaultState(): DatabaseState {
     bidders: [...initialBidders],
     submissions: [...initialSubmissions],
     documents: [...initialDocuments],
+    documentExtractions: [],
     sourceRecords: [...initialSourceRecords],
     verificationResults: [...initialVerificationResults],
+    complianceScores: [],
+    aiRecommendations: [],
     decisions: [],
     auditEvents: [...initialAuditEvents],
     sourceAdapterModes: {
@@ -108,6 +117,9 @@ class StorageEngine {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
         const parsed = JSON.parse(raw);
         if (parsed && parsed.tenders && Array.isArray(parsed.tenders)) {
+          parsed.documentExtractions ||= [];
+          parsed.complianceScores ||= [];
+          parsed.aiRecommendations ||= [];
           return parsed;
         }
       }

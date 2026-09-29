@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { uploadToGoogleCloudStorage } from './googleCloud.ts';
 
 const bucket = process.env.SUPABASE_STORAGE_BUCKET || 'bid-documents';
 let supabaseAdmin: SupabaseClient | undefined;
@@ -37,6 +38,10 @@ export async function storeDocument(input: {
     });
     if (error) throw new Error(`Supabase Storage upload failed: ${error.message}`);
     return { provider: 'SUPABASE', storagePath: objectPath } as const;
+  }
+
+  if (provider === 'google-cloud-storage') {
+    return uploadToGoogleCloudStorage({ objectPath, buffer: input.buffer, mimeType: input.mimeType });
   }
 
   const localPath = path.resolve('data', 'uploads', objectPath);

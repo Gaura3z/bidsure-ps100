@@ -49,6 +49,19 @@ The service-role key must stay only in `.env` or a deployment secret manager. Th
 
 If the service-role key is not configured, leave `DOCUMENT_STORAGE=local`; local files go under ignored `data/uploads/` for development.
 
+## 6. Google Cloud mode
+
+The repository also includes optional Google Cloud Storage and Vision OCR adapters. They are disabled by default. After creating a Google Cloud project, bucket, and server identity, set:
+
+```env
+GOOGLE_CLOUD_PROJECT_ID=your-project-id
+GOOGLE_CLOUD_STORAGE_BUCKET=your-private-bucket
+DOCUMENT_STORAGE=google-cloud-storage
+OCR_PROVIDER=google-vision
+```
+
+The server uses Google Application Default Credentials. Do not commit credential JSON. Google Cloud billing/quota and IAM setup must be completed in the Google Cloud Console before enabling these switches.
+
 ## 6. Google OAuth authentication
 
 The server now exposes `/api/auth/google/start` and `/api/auth/google/callback`. Before enabling this button, configure Google as a Supabase Auth provider and add this callback URL in both Supabase and Google Cloud:

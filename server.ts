@@ -7,7 +7,7 @@ import multer from 'multer';
 import { storage } from './src/db/storage.ts';
 import { aiProvider } from './src/services/aiProvider.ts';
 import { storeDocument } from './src/services/documentStorage.ts';
-import { extractTextWithLocalOcr, scanForMalware } from './src/services/documentPipeline.ts';
+import { extractTextWithConfiguredOcr, scanForMalware } from './src/services/documentPipeline.ts';
 import { createClient } from '@supabase/supabase-js';
 import {
   Tender,
@@ -662,7 +662,7 @@ app.post('/api/bidders/respond-clarification', upload.single('file'), async (req
   if (malware.status === 'INFECTED') {
     return res.status(422).json({ error: 'The uploaded document failed malware scanning.', scanEngine: malware.engine });
   }
-  const ocr = await extractTextWithLocalOcr({ buffer: req.file.buffer, mimeType: req.file.mimetype, documentId });
+  const ocr = await extractTextWithConfiguredOcr({ buffer: req.file.buffer, mimeType: req.file.mimetype, documentId });
 
   // Add the uploaded document metadata after durable storage succeeds.
   const newDoc: BidDocument = {

@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { extractTextWithGoogleVision } from './googleCloud.ts';
 
 const execFileAsync = promisify(execFile);
 export type ProcessingStatus = 'CLEAN' | 'INFECTED' | 'PENDING' | 'NOT_CONFIGURED' | 'FAILED';
@@ -42,4 +43,17 @@ export async function extractTextWithLocalOcr(input: { buffer: Buffer; mimeType:
   } finally {
     await Promise.all([fs.rm(tempPath, { force: true }), fs.rm(`${outputBase}.txt`, { force: true })]);
   }
+}
+
+export async function extractTextWithConfiguredOcr(input: { buffer: Buffer; mimeType: string; documentId: string }) {
+  if (process.env.OCR_PROVIDER === 'google-vision') {
+    try {
+      const result = await extractTextWithGoogleVision(input);
+      return { status: 'CLEAN' as const, engine: result.provider, text: result.text };
+    } catch (error: any) {
+      console.warn('[BIDSure OCR] Google Vision unavailable:', error?.message || error);
+      return { status: 'FAILED' as const, engine: 'GOOGLE_CLOUD_VISION' };
+    }
+  }
+  return extractTextWithLocalOcr(input);
 }

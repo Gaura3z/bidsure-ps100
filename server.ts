@@ -83,7 +83,7 @@ function logAuditEvent(
     timestamp: new Date().toISOString(),
     actorUserId: currentActor.id,
     actorName: currentActor.name,
-    actorRole: currentActor.designation || 'Procurement Officer',
+    actorRole: currentActor.role,
     action,
     entityType,
     entityId,
@@ -121,7 +121,9 @@ function requireRole(req: Request, res: Response, roles: User['role'][]) {
 
 // Health check
 app.get('/api/health', async (_req: Request, res: Response) => {
-  const diagnostic = await aiProvider.checkHealth();
+  // Health must never depend on a remote AI request. A bad key or provider
+  // timeout should not make the application appear offline.
+  const diagnostic = aiProvider.getConfigurationSnapshot();
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -343,6 +345,8 @@ app.post('/api/tenders', (req: Request, res: Response) => {
 
 // AI Requirement Clause Extraction using Gemini API
 app.post('/api/tenders/extract-requirements', async (req: Request, res: Response) => {
+  const actor = requireRole(req, res, ['PROCUREMENT_OFFICER', 'COMPLIANCE_ANALYST']);
+  if (!actor) return;
   const { tenderDocumentText, tenderTitle } = req.body;
 
   try {
@@ -524,6 +528,8 @@ app.post('/api/source-adapters/mode', (req: Request, res: Response) => {
 
 // Run AI + Deterministic Verification Pipeline
 app.post('/api/compliance/run-verification', async (req: Request, res: Response) => {
+  const actor = requireRole(req, res, ['PROCUREMENT_OFFICER', 'COMPLIANCE_ANALYST']);
+  if (!actor) return;
   const { submissionId } = req.body;
   const submission = db.submissions.find((s) => s.id === submissionId);
   if (!submission) return res.status(404).json({ error: 'Submission not found' });
@@ -633,7 +639,7 @@ app.post('/api/bidders/respond-clarification', upload.single('file'), async (req
   const { user } = actor;
   const { submissionId = 'sub-01', documentTitle, docType, remarks } = req.body;
 
-  const submission = db.submissions.find((s) => s.id === submissionId || s.bidderId === 'bidder-01');
+  const submission = db.submissions.find((s) => s.id === submissionId);
   if (!submission) return res.status(404).json({ error: 'Submission not found' });
   if (user.id !== 'user-bidder-01' || submission.bidderId !== 'bidder-01') {
     return res.status(403).json({ error: 'You may only submit clarification evidence for your own bidder account.' });
@@ -726,6 +732,10 @@ app.post('/api/compliance/override', (req: Request, res: Response) => {
 
   const { resultId, newStatus, reason } = req.body;
 
+  if (!['PASS', 'FAIL', 'NEEDS_REVIEW', 'NOT_APPLICABLE', 'UNVERIFIED'].includes(newStatus)) {
+    return res.status(400).json({ error: 'Invalid verification status.' });
+  }
+
   if (!reason || reason.trim().length < 5) {
     return res.status(400).json({ error: 'Officer override requires a mandatory justification remarks (min 5 characters).' });
   }
@@ -764,6 +774,10 @@ app.post('/api/decisions', (req: Request, res: Response) => {
   }
 
   const { submissionId, decision, remarks, clarificationSubject, clarificationDeadline } = req.body;
+
+  if (!['APPROVE_QUALIFIED', 'REJECT_DISQUALIFIED', 'SEND_CLARIFICATION', 'KEEP_UNDER_REVIEW'].includes(decision)) {
+    return res.status(400).json({ error: 'Invalid procurement decision.' });
+  }
 
   if (!remarks || remarks.trim().length < 5) {
     return res.status(400).json({ error: 'A formal decision remark is mandatory for the audit trail.' });

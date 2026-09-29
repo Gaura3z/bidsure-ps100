@@ -123,6 +123,7 @@ export const bidSubmissions = pgTable('bid_submissions', {
   refUnique: uniqueIndex('bid_submissions_ref_unique').on(table.submissionRef),
   tenderIdx: index('bid_submissions_tender_idx').on(table.tenderId),
   bidderIdx: index('bid_submissions_bidder_idx').on(table.bidderId),
+  tenderBidderUnique: uniqueIndex('bid_submissions_tender_bidder_unique').on(table.tenderId, table.bidderId),
 }));
 
 export const bidDocuments = pgTable('bid_documents', {
@@ -175,6 +176,17 @@ export const sourceRecords = pgTable('source_records', {
   recordTimestamp: timestamp('record_timestamp', { withTimezone: true, mode: 'string' }).notNull(),
 }, (table) => ({
   identifierIdx: index('source_records_identifier_idx').on(table.adapterName, table.identifierChecked),
+}));
+
+export const sourceAdapterModes = pgTable('source_adapter_modes', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull().references(() => organizations.id),
+  adapterName: text('adapter_name').notNull(),
+  mode: text('mode').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+}, (table) => ({
+  organizationAdapterUnique: uniqueIndex('source_adapter_modes_org_adapter_unique').on(table.organizationId, table.adapterName),
+  organizationIdx: index('source_adapter_modes_organization_idx').on(table.organizationId),
 }));
 
 export const verificationResults = pgTable('verification_results', {
@@ -275,6 +287,7 @@ export const pgSchema = {
   bidDocuments,
   documentExtractions,
   sourceRecords,
+  sourceAdapterModes,
   verificationResults,
   complianceScores,
   aiRecommendations,

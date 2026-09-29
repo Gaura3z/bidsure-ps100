@@ -132,7 +132,10 @@ class ResilientAIProvider {
           input: contents,
         };
         if (config && typeof config.responseMimeType === 'string') {
-          interactionParams.response_mime_type = config.responseMimeType;
+          interactionParams.response_format = [{
+            type: 'text',
+            mime_type: config.responseMimeType,
+          }];
         }
         const response = await withTimeout(slot.client.interactions.create(interactionParams as any), 15000);
 
@@ -222,6 +225,26 @@ class ResilientAIProvider {
 
   public getModelName(): string {
     return this.model;
+  }
+
+  public getConfigurationSnapshot(): ProviderDiagnostic {
+    const primarySlot = this.providers.find((p) => p.label === 'PRIMARY');
+    const secondarySlot = this.providers.find((p) => p.label === 'SECONDARY');
+    const configured = this.providers.length > 0;
+    return {
+      configured,
+      model: this.model,
+      activeProvider: configured ? this.providers[this.activeIndex]?.label || 'PRIMARY' : 'NONE',
+      primaryConfigured: Boolean(primarySlot),
+      secondaryConfigured: Boolean(secondarySlot),
+      primaryMasked: primarySlot?.masked || null,
+      secondaryMasked: secondarySlot?.masked || null,
+      failoverReady: this.providers.length > 1,
+      mode: configured ? 'LIVE_GEMINI_AI' : 'DETERMINISTIC_GROUNDED_FALLBACK',
+      message: configured
+        ? `Gemini is configured with ${this.model}. Live availability is checked only when an AI operation runs.`
+        : 'No Gemini provider key configured. Deterministic compliance rules are active.',
+    };
   }
 }
 

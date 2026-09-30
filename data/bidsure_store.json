@@ -1,6 +1,6 @@
 {
   "version": "2.4.0",
-  "lastSavedAt": "2026-09-29T10:13:38.992Z",
+  "lastSavedAt": "2026-09-30T03:44:46.205Z",
   "organization": {
     "id": "org-cpcl-01",
     "name": "Chennai Petroleum Corporation Limited (CPCL)",
@@ -392,13 +392,13 @@
       "bidderId": "bidder-01",
       "submissionRef": "BID/2026/CPCL/042-01",
       "status": "REVIEW_REQUIRED",
-      "overallScore": 82,
-      "riskLevel": "MEDIUM",
-      "checksPassed": 14,
-      "checksReview": 2,
-      "checksFailed": 2,
+      "overallScore": 79,
+      "riskLevel": "HIGH",
+      "checksPassed": 9,
+      "checksReview": 1,
+      "checksFailed": 1,
       "submittedAt": "2026-10-29T11:30:00Z",
-      "verifiedAt": "2026-10-29T11:42:00Z"
+      "verifiedAt": "2026-09-29T17:04:39.510Z"
     },
     {
       "id": "sub-02",
@@ -907,6 +907,129 @@
   "decisions": [],
   "auditEvents": [
     {
+      "id": "aud-1790739886204-77",
+      "timestamp": "2026-09-30T03:44:46.204Z",
+      "actorUserId": "user-officer-01",
+      "actorName": "Rajesh Kumar",
+      "actorRole": "PROCUREMENT_OFFICER",
+      "action": "REGISTRATION_REQUESTED",
+      "entityType": "USER",
+      "entityId": "REG-2026-OOTOEW",
+      "summary": "Access request submitted for demo-reviewer@example.com.",
+      "details": {
+        "email": "demo-reviewer@example.com",
+        "organization": "Demo Procurement Labs",
+        "requestedRole": "BIDDER_VENDOR",
+        "status": "PENDING_APPROVAL"
+      },
+      "ruleVersion": "v2.4-2026",
+      "evidenceHash": "dhwl1epn5h46rnugudan7"
+    },
+    {
+      "id": "aud-1790702542215-437",
+      "timestamp": "2026-09-29T17:22:22.215Z",
+      "actorUserId": "user-officer-01",
+      "actorName": "Rajesh Kumar",
+      "actorRole": "PROCUREMENT_OFFICER",
+      "action": "USER_LOGIN",
+      "entityType": "TENDER",
+      "entityId": "user-officer-01",
+      "summary": "Rajesh Kumar (PROCUREMENT_OFFICER) logged in to BIDSure workbench.",
+      "ruleVersion": "v2.4-2026",
+      "evidenceHash": "6qo3d4x3hixxpxikovoz1a"
+    },
+    {
+      "id": "aud-1790701494517-235",
+      "timestamp": "2026-09-29T17:04:54.517Z",
+      "actorUserId": "user-officer-01",
+      "actorName": "Rajesh Kumar",
+      "actorRole": "PROCUREMENT_OFFICER",
+      "action": "VERIFICATION_EXECUTED",
+      "entityType": "VERIFICATION",
+      "entityId": "sub-01",
+      "summary": "AI verification and deterministic rules engine completed. Score: 79%, Risk: HIGH.",
+      "ruleVersion": "v2.4-2026",
+      "evidenceHash": "2zczvxyb9rzicdw1dt2nct"
+    },
+    {
+      "id": "aud-1790701479447-688",
+      "timestamp": "2026-09-29T17:04:39.447Z",
+      "actorUserId": "user-officer-01",
+      "actorName": "Rajesh Kumar",
+      "actorRole": "PROCUREMENT_OFFICER",
+      "action": "USER_LOGIN",
+      "entityType": "TENDER",
+      "entityId": "user-officer-01",
+      "summary": "Rajesh Kumar (PROCUREMENT_OFFICER) logged in to BIDSure workbench.",
+      "ruleVersion": "v2.4-2026",
+      "evidenceHash": "guxpp61cf0tx9zid484vj"
+    },
+    {
+      "id": "aud-1790701291098-894",
+      "timestamp": "2026-09-29T17:01:31.098Z",
+      "actorUserId": "user-officer-01",
+      "actorName": "Rajesh Kumar",
+      "actorRole": "PROCUREMENT_OFFICER",
+      "action": "VERIFICATION_EXECUTED",
+      "entityType": "VERIFICATION",
+      "entityId": "sub-01",
+      "summary": "AI verification and deterministic rules engine completed. Score: 79%, Risk: HIGH.",
+      "ruleVersion": "v2.4-2026",
+      "evidenceHash": "kxikxd3qa9y5jvdg03tvn"
+    },
+    {
+      "id": "aud-1790701281974-879",
+      "timestamp": "2026-09-29T17:01:21.974Z",
+      "actorUserId": "user-officer-01",
+      "actorName": "Rajesh Kumar",
+      "actorRole": "PROCUREMENT_OFFICER",
+      "action": "USER_LOGIN",
+      "entityType": "TENDER",
+      "entityId": "user-officer-01",
+      "summary": "Rajesh Kumar (PROCUREMENT_OFFICER) logged in to BIDSure workbench.",
+      "ruleVersion": "v2.4-2026",
+      "evidenceHash": "usigcv9w4b0s0dlbsrzju"
+    },
+    {
+      "id": "aud-1790683518571-82",
+      "timestamp": "2026-09-29T12:05:18.571Z",
+      "actorUserId": "user-bidder-01",
+      "actorName": "Amit Patel",
+      "actorRole": "Authorized Signatory",
+      "action": "USER_LOGIN",
+      "entityType": "TENDER",
+      "entityId": "user-bidder-01",
+      "summary": "Amit Patel (BIDDER_VENDOR) logged in to BIDSure workbench.",
+      "ruleVersion": "v2.4-2026",
+      "evidenceHash": "4rge1vk8tlrhnuupgdpht4"
+    },
+    {
+      "id": "aud-1790683181711-562",
+      "timestamp": "2026-09-29T11:59:41.711Z",
+      "actorUserId": "user-bidder-01",
+      "actorName": "Amit Patel",
+      "actorRole": "Authorized Signatory",
+      "action": "USER_LOGIN",
+      "entityType": "TENDER",
+      "entityId": "user-bidder-01",
+      "summary": "Amit Patel (BIDDER_VENDOR) logged in to BIDSure workbench.",
+      "ruleVersion": "v2.4-2026",
+      "evidenceHash": "3q81h7ow22o2nnmjj7dz2f"
+    },
+    {
+      "id": "aud-1790683179868-673",
+      "timestamp": "2026-09-29T11:59:39.868Z",
+      "actorUserId": "user-analyst-01",
+      "actorName": "Priya Sharma",
+      "actorRole": "Technical Compliance Analyst",
+      "action": "USER_LOGIN",
+      "entityType": "TENDER",
+      "entityId": "user-analyst-01",
+      "summary": "Priya Sharma (COMPLIANCE_ANALYST) logged in to BIDSure workbench.",
+      "ruleVersion": "v2.4-2026",
+      "evidenceHash": "wueolm6sipxbjmxxfxk1g"
+    },
+    {
       "id": "aud-01",
       "timestamp": "2026-10-29T10:15:00Z",
       "actorUserId": "user-officer-01",
@@ -974,5 +1097,8 @@
     "ESIC": "MOCK",
     "DIGILOCKER": "MOCK",
     "DEBARMENT": "MOCK"
-  }
+  },
+  "documentExtractions": [],
+  "complianceScores": [],
+  "aiRecommendations": []
 }

@@ -33,6 +33,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const SESSION_COOKIE = 'bidsure_session';
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+const AUTH_MODE = process.env.AUTH_MODE || 'demo';
 const sessions = new Map<string, { userId: string; expiresAt: number }>();
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -220,22 +221,60 @@ app.post('/api/database/reset', (req: Request, res: Response) => {
 
 // Auth & Session
 app.get('/api/session', (req: Request, res: Response) => {
-  if (!resolveSession(req)) issueSession(res, db.currentUser);
+  const sessionUser = resolveSession(req);
+  if (!sessionUser) {
+    if (AUTH_MODE !== 'demo') {
+      return res.status(401).json({ error: 'Authentication required.' });
+    }
+    issueSession(res, db.currentUser);
+  }
   res.json({
-    currentUser: db.currentUser,
+    currentUser: sessionUser || db.currentUser,
     users: db.users,
     organization: db.organization,
   });
 });
 
 app.post('/api/auth/login', (req: Request, res: Response) => {
-  const { role, email } = req.body;
-  const user = db.users.find((u) => u.email === email || u.role === role) || db.users[0];
+  const { role, email, password } = req.body;
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  let user: User | undefined;
+
+  if (AUTH_MODE === 'supabase') {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_PUBLISHABLE_KEY;
+    if (!url || !key) return res.status(503).json({ error: 'Supabase authentication is not configured.' });
+    if (!normalizedEmail || typeof password !== 'string' || password.length < 8) {
+      return res.status(400).json({ error: 'Enter a valid email and password.' });
+    }
+    const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    return supabase.auth.signInWithPassword({ email: normalizedEmail, password }).then(({ data, error }) => {
+      if (error || !data.user?.email) return res.status(401).json({ error: 'Invalid email or password.' });
+      user = db.users.find((candidate) => candidate.email.toLowerCase() === data.user!.email!.toLowerCase());
+      if (!user) return res.status(403).json({ error: 'This account is not mapped to an approved BidSure role.' });
+      db.currentUser = user;
+      issueSession(res, user);
+      storage.save();
+      logAuditEvent('USER_LOGIN', 'TENDER', user.id, `${user.name} (${user.role}) logged in to BIDSure workbench.`, user);
+      return res.json({ success: true, user });
+    }).catch(() => res.status(401).json({ error: 'Authentication service unavailable.' }));
+  }
+
+  user = db.users.find((candidate) => candidate.email.toLowerCase() === normalizedEmail && candidate.role === role)
+    || db.users.find((candidate) => candidate.role === role)
+    || db.users[0];
   db.currentUser = user;
   issueSession(res, user);
   storage.save();
   logAuditEvent('USER_LOGIN', 'TENDER', user.id, `${user.name} (${user.role}) logged in to BIDSure workbench.`, user);
   res.json({ success: true, user: db.currentUser });
+});
+
+app.post('/api/auth/logout', (req: Request, res: Response) => {
+  const token = readCookie(req, SESSION_COOKIE);
+  if (token) sessions.delete(token);
+  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`);
+  res.json({ success: true });
 });
 
 // Production authentication boundary. Supabase verifies Google OAuth; BidSure maps the verified email to a database role.

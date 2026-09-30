@@ -80,7 +80,7 @@ export const BidderEvaluationView: React.FC<BidderEvaluationViewProps> = ({
   const currentTender = tenders.find((t) => t.id === selectedTenderId) || tenders.find((t) => t.id === submissions.find((s) => s.bidderId === currentBidder.id)?.tenderId) || tenders[0];
   const currentSubmission = submissions.find((s) => s.bidderId === currentBidder.id && s.tenderId === currentTender?.id);
 
-  const bidderDocuments = documents.filter((d) => d.bidderId === currentBidder.id);
+  const bidderDocuments = documents.filter((d) => d.bidderId === currentBidder.id && d.bidSubmissionId === currentSubmission?.id);
   const bidderResults = verificationResults.filter((r) => r.bidSubmissionId === currentSubmission?.id);
 
   // Group stats
@@ -562,6 +562,17 @@ export const BidderEvaluationView: React.FC<BidderEvaluationViewProps> = ({
         {/* Tab 3: Submitted Documents List (matching screenshot 4 & 5) */}
         {activeSubTab === 'DOCUMENTS' && (
           <div className="p-5">
+            {bidderDocuments.length === 0 && (
+              <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
+                <strong>Documents required for this tender</strong>
+                <ul className="mt-2 list-disc pl-5 space-y-1">
+                  {requirements.filter((requirement) => requirement.tenderId === currentTender?.id).map((requirement) => (
+                    <li key={requirement.id}>{requirement.evidenceDocType} <span className="text-blue-700">({requirement.clauseNumber})</span></li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-blue-800">Use “Respond to Clarification & Upload Evidence” above to upload the first supporting document. The file is linked to this tender submission.</p>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {bidderDocuments.map((doc) => {
                 const matchingResult = bidderResults.find(

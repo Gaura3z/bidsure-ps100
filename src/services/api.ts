@@ -123,6 +123,10 @@ export async function fetchBidders(): Promise<Bidder[]> {
   return requestJson<Bidder[]>(`${API_BASE}/bidders`);
 }
 
+export async function fetchSubmissions(): Promise<BidSubmission[]> {
+  return requestJson<BidSubmission[]>(`${API_BASE}/submissions`);
+}
+
 export async function fetchBidderDetails(bidderId: string) {
   return requestJson(`${API_BASE}/bidders/${bidderId}`);
 }

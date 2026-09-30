@@ -29,10 +29,12 @@ import {
 import {
   fetchTenders,
   fetchBidders,
+  fetchSubmissions,
   fetchAuditTrail,
   fetchSourceAdapters,
   fetchSession,
   fetchHealth,
+  fetchTenderDetails,
   runVerificationPipeline,
   overrideVerificationResult,
   recordOfficerDecision,
@@ -166,6 +168,14 @@ export default function App() {
       } catch (e) {}
 
       try {
+        const loadedSubmissions = await fetchSubmissions();
+        if (Array.isArray(loadedSubmissions)) setSubmissions((previous) => {
+          const serverIds = new Set(loadedSubmissions.map((submission) => submission.id));
+          return [...loadedSubmissions, ...previous.filter((submission) => !serverIds.has(submission.id))];
+        });
+      } catch (e) {}
+
+      try {
         const loadedAudits = await fetchAuditTrail();
         if (Array.isArray(loadedAudits) && loadedAudits.length > 0) {
           setAuditEvents(loadedAudits);
@@ -190,6 +200,8 @@ export default function App() {
       try {
         const latest = await fetchTenders();
         if (Array.isArray(latest)) setTenders(latest);
+        const latestSubmissions = await fetchSubmissions();
+        if (Array.isArray(latestSubmissions)) setSubmissions(latestSubmissions);
       } catch (_) {
         // Keep the last known data if the service is waking up or temporarily unavailable.
       }
@@ -445,6 +457,13 @@ export default function App() {
 
   const handleApplyTender = async (tenderId: string) => {
     try {
+      const detail: any = await fetchTenderDetails(tenderId);
+      if (Array.isArray(detail?.requirements)) {
+        setRequirements((previous) => [
+          ...previous.filter((requirement) => requirement.tenderId !== tenderId),
+          ...detail.requirements,
+        ]);
+      }
       const submission = await applyForTender(tenderId);
       setSubmissions((previous) => [submission, ...previous.filter((item) => item.id !== submission.id)]);
       setSelectedTenderId(tenderId);
@@ -573,6 +592,12 @@ export default function App() {
             bidders={bidders}
             onSelectTender={(tenderId) => {
               setSelectedTenderId(tenderId);
+              void fetchTenderDetails(tenderId).then((detail: any) => {
+                if (Array.isArray(detail?.requirements)) setRequirements((previous) => [
+                  ...previous.filter((requirement) => requirement.tenderId !== tenderId),
+                  ...detail.requirements,
+                ]);
+              }).catch(() => undefined);
               setActiveTab('EVALUATION');
             }}
             onApplyTender={handleApplyTender}
@@ -591,6 +616,12 @@ export default function App() {
             submissions={submissions}
             onSelectTender={(tenderId) => {
               setSelectedTenderId(tenderId);
+              void fetchTenderDetails(tenderId).then((detail: any) => {
+                if (Array.isArray(detail?.requirements)) setRequirements((previous) => [
+                  ...previous.filter((requirement) => requirement.tenderId !== tenderId),
+                  ...detail.requirements,
+                ]);
+              }).catch(() => undefined);
               setActiveTab('EVALUATION');
             }}
             onOpenCreateTender={openCreateTender}

@@ -402,7 +402,10 @@ app.post('/api/tenders', (req: Request, res: Response) => {
   }
 
   logAuditEvent('TENDER_CREATED', 'TENDER', newTender.id, `Tender ${newTender.tenderId} created with ${requirements?.length || 0} requirements.`);
-  res.status(201).json(newTender);
+  res.status(201).json({
+    ...newTender,
+    requirements: db.requirements.filter((requirement) => requirement.tenderId === newTender.id),
+  });
 });
 
 app.post('/api/tenders/:id/apply', (req: Request, res: Response) => {
@@ -580,6 +583,15 @@ app.get('/api/bidders/:id', (req: Request, res: Response) => {
   const documents = db.documents.filter((d) => d.bidderId === bidder.id);
   const results = submission ? db.verificationResults.filter((r) => r.bidSubmissionId === submission.id) : [];
   res.json({ bidder, submission, documents, results });
+});
+
+app.get('/api/submissions', (req: Request, res: Response) => {
+  const actor = requireRole(req, res, ['PROCUREMENT_OFFICER', 'COMPLIANCE_ANALYST', 'BIDDER_VENDOR', 'ADMIN']);
+  if (!actor) return;
+  const submissions = actor.role === 'BIDDER_VENDOR'
+    ? db.submissions.filter((submission) => submission.bidderId === 'bidder-01')
+    : db.submissions;
+  res.json(submissions);
 });
 
 // Source Adapter Gateway: Get list & toggle modes (LIVE, MOCK, MANUAL)

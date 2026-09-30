@@ -6,7 +6,6 @@ import {
   Users2,
   History,
   ShieldCheck,
-  Smartphone,
   ChevronDown,
   UserCheck,
   Building2,
@@ -24,8 +23,6 @@ interface NavbarProps {
   setActiveTab: (tab: ActiveTab) => void;
   currentUser: User;
   onSwitchUser: (role: string) => void;
-  isMobileSimulatorOpen: boolean;
-  setIsMobileSimulatorOpen: (open: boolean) => void;
   onOpenAdapters: () => void;
   onOpenDatabase: () => void;
 }
@@ -35,8 +32,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   currentUser,
   onSwitchUser,
-  isMobileSimulatorOpen,
-  setIsMobileSimulatorOpen,
   onOpenAdapters,
   onOpenDatabase,
 }) => {
@@ -246,22 +241,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </nav>
 
-        {/* Right Tools: Mobile Simulator, Role Switcher & Hamburger */}
+        {/* Right Tools: Role Switcher & Hamburger */}
         <div className="flex items-center gap-2">
-          {/* Mobile Flow Toggle Button */}
-          <button
-            onClick={() => setIsMobileSimulatorOpen(!isMobileSimulatorOpen)}
-            className={`px-2.5 py-1.5 rounded-md text-xs font-medium border flex items-center gap-1.5 cursor-pointer transition-colors ${
-              isMobileSimulatorOpen
-                ? 'bg-purple-600 text-white border-purple-700 shadow-2xs'
-                : 'bg-white text-purple-700 border-purple-200 hover:bg-purple-50'
-            }`}
-            title="Preview Dedicated Mobile Flow as depicted in SIH guidelines"
-          >
-            <Smartphone className="w-4 h-4" />
-            <span className="hidden sm:inline">Mobile Flow</span>
-          </button>
-
           {/* User Profile & Role Switcher */}
           <div className="relative">
             <button

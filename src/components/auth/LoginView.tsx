@@ -32,6 +32,12 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [password, setPassword] = useState('••••••••••••');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [registrationName, setRegistrationName] = useState('');
+  const [registrationEmail, setRegistrationEmail] = useState('');
+  const [registrationOrganization, setRegistrationOrganization] = useState('');
+  const [registrationRole, setRegistrationRole] = useState<'BIDDER_VENDOR' | 'COMPLIANCE_ANALYST'>('BIDDER_VENDOR');
+  const [registrationStatus, setRegistrationStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [registrationBusy, setRegistrationBusy] = useState(false);
 
   const demoPasswords: Record<string, string> = {
     PROCUREMENT_OFFICER: 'Officer@BidSure2026!',
@@ -62,6 +68,35 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
   const handleGoogleLogin = () => {
     window.location.assign('/api/auth/google/start');
+  };
+
+  const handleRegistration = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRegistrationBusy(true);
+    setRegistrationStatus(null);
+    try {
+      const response = await fetch('/api/auth/register-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          name: registrationName,
+          email: registrationEmail,
+          organization: registrationOrganization,
+          requestedRole: registrationRole,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Unable to submit your request.');
+      setRegistrationStatus({ type: 'success', message: `${payload.message} Request ID: ${payload.requestId}` });
+      setRegistrationName('');
+      setRegistrationEmail('');
+      setRegistrationOrganization('');
+    } catch (error) {
+      setRegistrationStatus({ type: 'error', message: error instanceof Error ? error.message : 'Unable to submit your request.' });
+    } finally {
+      setRegistrationBusy(false);
+    }
   };
 
   return (
@@ -197,6 +232,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
             </div>
           </div>
 
+          {activeSubTab === 'SIGN_IN' && <>
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
             <div>
@@ -290,6 +326,40 @@ export const LoginView: React.FC<LoginViewProps> = ({
             <span className="text-base">G</span>
             <span>Continue with Google</span>
           </button>
+          </>}
+
+          {activeSubTab === 'REGISTER' && (
+            <form onSubmit={handleRegistration} className="space-y-4 text-xs">
+              <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-[11px] leading-relaxed text-blue-900">
+                Request BidSure access. An administrator will verify your organization and provision the approved account.
+              </div>
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Full name</label>
+                <input value={registrationName} onChange={(e) => setRegistrationName(e.target.value)} placeholder="Enter your full name" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:bg-white focus:outline-hidden" required minLength={2} />
+              </div>
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Work email</label>
+                <div className="relative"><Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" /><input type="email" value={registrationEmail} onChange={(e) => setRegistrationEmail(e.target.value)} placeholder="name@organization.gov.in" className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:bg-white focus:outline-hidden" required /></div>
+              </div>
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Organization / company</label>
+                <div className="relative"><Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-3" /><input value={registrationOrganization} onChange={(e) => setRegistrationOrganization(e.target.value)} placeholder="Organization name" className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:bg-white focus:outline-hidden" required minLength={2} /></div>
+              </div>
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Access requested for</label>
+                <select value={registrationRole} onChange={(e) => setRegistrationRole(e.target.value as 'BIDDER_VENDOR' | 'COMPLIANCE_ANALYST')} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:bg-white focus:outline-hidden">
+                  <option value="BIDDER_VENDOR">Bidder / Vendor</option>
+                  <option value="COMPLIANCE_ANALYST">Compliance Analyst</option>
+                </select>
+              </div>
+              {registrationStatus && <div role="status" className={`rounded-lg p-3 text-[11px] ${registrationStatus.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>{registrationStatus.message}</div>}
+              <button type="submit" disabled={registrationBusy} className="w-full py-2.5 bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer">
+                {registrationBusy ? 'Submitting…' : 'Submit Registration Request'}
+                {!registrationBusy && <ArrowRight className="w-4 h-4" />}
+              </button>
+              <button type="button" onClick={() => setActiveSubTab('SIGN_IN')} className="w-full text-blue-700 hover:underline font-semibold cursor-pointer">Back to Sign In</button>
+            </form>
+          )}
         </div>
 
         {/* Footer Note */}

@@ -230,7 +230,7 @@ export interface AuditEvent {
   actorName: string;
   actorRole: string;
   action: string;
-  entityType: 'TENDER' | 'BID_SUBMISSION' | 'DOCUMENT' | 'VERIFICATION' | 'DECISION' | 'ADAPTER';
+  entityType: 'TENDER' | 'BID_SUBMISSION' | 'DOCUMENT' | 'VERIFICATION' | 'DECISION' | 'ADAPTER' | 'USER';
   entityId: string;
   summary: string;
   details?: Record<string, any>;

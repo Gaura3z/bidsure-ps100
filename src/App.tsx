@@ -49,7 +49,6 @@ import { SourceGatewayModal } from './components/adapters/SourceGatewayModal.tsx
 import { CreateTenderModal } from './components/tender/CreateTenderModal.tsx';
 import { LandingView } from './components/landing/LandingView.tsx';
 import { LoginView } from './components/auth/LoginView.tsx';
-import { MobilePreviewWrapper } from './components/mobile/MobilePreviewWrapper.tsx';
 import { DatabaseInspectorModal } from './components/database/DatabaseInspectorModal.tsx';
 
 export default function App() {
@@ -68,7 +67,6 @@ export default function App() {
   const [selectedBidderId, setSelectedBidderId] = useState<string>('bidder-01'); // Default ABC Technologies
   const [isCreateTenderModalOpen, setIsCreateTenderModalOpen] = useState(false);
   const [isSourceGatewayModalOpen, setIsSourceGatewayModalOpen] = useState(false);
-  const [isMobileSimulatorOpen, setIsMobileSimulatorOpen] = useState(false);
   const [isDatabaseModalOpen, setIsDatabaseModalOpen] = useState(false);
 
   const [adapterModes, setAdapterModes] = useState<Record<string, 'LIVE' | 'MOCK' | 'MANUAL'>>({
@@ -439,8 +437,6 @@ export default function App() {
         setActiveTab={setActiveTab}
         currentUser={currentUser}
         onSwitchUser={handleSwitchUser}
-        isMobileSimulatorOpen={isMobileSimulatorOpen}
-        setIsMobileSimulatorOpen={setIsMobileSimulatorOpen}
         onOpenAdapters={() => setIsSourceGatewayModalOpen(true)}
         onOpenDatabase={() => setIsDatabaseModalOpen(true)}
       />
@@ -614,18 +610,6 @@ export default function App() {
         isOpen={isCreateTenderModalOpen}
         onClose={() => setIsCreateTenderModalOpen(false)}
         onTenderCreated={handleTenderCreated}
-      />
-
-      {/* Dedicated Mobile Screen Flow Simulator */}
-      <MobilePreviewWrapper
-        isOpen={isMobileSimulatorOpen}
-        onClose={() => setIsMobileSimulatorOpen(false)}
-        tenders={tenders}
-        bidders={bidders}
-        submissions={submissions}
-        verificationResults={verificationResults}
-        documents={documents}
-        onSelectBidder={(id) => setSelectedBidderId(id)}
       />
 
       {/* Floating Role Switch Feedback Toast */}

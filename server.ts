@@ -277,6 +277,26 @@ app.post('/api/auth/logout', (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
+// Public registration is an access request, never an automatic privileged account creation.
+// An officer/admin must approve and provision the Supabase account separately.
+app.post('/api/auth/register-request', (req: Request, res: Response) => {
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const organization = typeof req.body?.organization === 'string' ? req.body.organization.trim() : '';
+  const requestedRole = req.body?.requestedRole === 'COMPLIANCE_ANALYST' ? 'COMPLIANCE_ANALYST' : 'BIDDER_VENDOR';
+  if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || organization.length < 2) {
+    return res.status(400).json({ error: 'Enter your name, a valid email, and organization.' });
+  }
+  const requestId = `REG-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  logAuditEvent('REGISTRATION_REQUESTED', 'USER', requestId, `Access request submitted for ${email}.`, undefined, {
+    email,
+    organization,
+    requestedRole,
+    status: 'PENDING_APPROVAL',
+  });
+  return res.status(201).json({ success: true, requestId, message: 'Your request was submitted for administrator approval.' });
+});
+
 // Production authentication boundary. Supabase verifies Google OAuth; BidSure maps the verified email to a database role.
 app.get('/api/auth/google/start', async (_req: Request, res: Response) => {
   const url = process.env.SUPABASE_URL;

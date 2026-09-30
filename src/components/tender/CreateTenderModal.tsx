@@ -34,6 +34,8 @@ export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
   );
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractedRequirements, setExtractedRequirements] = useState<any[]>([]);
+  const [requiredDocuments, setRequiredDocuments] = useState<string[]>([]);
+  const [newDocument, setNewDocument] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
@@ -43,6 +45,8 @@ export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
     try {
       const data = await extractRequirementsAI(tenderDocumentText, title);
       setExtractedRequirements(data.requirements || []);
+      const inferredDocuments = (data.requirements || []).map((req: any) => req.evidenceDocType || req.documentType || `${req.title} supporting document`);
+      setRequiredDocuments(Array.from(new Set(inferredDocuments)));
       setStep(3);
     } catch (e) {
       console.error('AI extraction error:', e);
@@ -94,7 +98,7 @@ export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 text-slate-900 relative">
+      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl border border-slate-200 text-slate-900 relative">
         <div className="flex items-center justify-between pb-4 border-b border-slate-200">
           <div className="flex items-center gap-2">
             <FilePlus2 className="w-5 h-5 text-blue-700" />
@@ -305,6 +309,26 @@ export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
               ))}
             </div>
 
+            <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-900">Documents bidders must submit ({requiredDocuments.length})</span>
+                <span className="text-[10px] text-blue-800 font-semibold">Editable before finalizing</span>
+              </div>
+              <div className="space-y-1.5">
+                {requiredDocuments.map((documentName, idx) => (
+                  <div key={`${documentName}-${idx}`} className="flex items-center gap-2 rounded-lg bg-white border border-blue-100 px-2.5 py-2">
+                    <FileText className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+                    <input value={documentName} onChange={(e) => setRequiredDocuments((docs) => docs.map((doc, i) => i === idx ? e.target.value : doc))} className="min-w-0 flex-1 bg-transparent text-[11px] text-slate-700 focus:outline-hidden" />
+                    <button type="button" onClick={() => setRequiredDocuments((docs) => docs.filter((_, i) => i !== idx))} className="text-slate-400 hover:text-rose-600 cursor-pointer" aria-label={`Remove ${documentName}`}><X className="w-3.5 h-3.5" /></button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input value={newDocument} onChange={(e) => setNewDocument(e.target.value)} placeholder="Add another required document" className="min-w-0 flex-1 px-2.5 py-2 bg-white border border-blue-200 rounded-lg text-[11px] focus:outline-hidden" />
+                <button type="button" onClick={() => { const value = newDocument.trim(); if (!value) return; setRequiredDocuments((docs) => [...docs, value]); setNewDocument(''); }} className="px-3 py-2 bg-blue-700 text-white rounded-lg text-[11px] font-semibold cursor-pointer">Add</button>
+              </div>
+            </div>
+
             <div className="pt-3 flex items-center justify-between">
               <button
                 type="button"
@@ -347,6 +371,10 @@ export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
                 <span className="font-bold text-blue-900 font-mono">
                   {extractedRequirements.length || 6} Defined
                 </span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500">Bidder documents:</span>
+                <span className="font-bold text-blue-900">{requiredDocuments.length} Required</span>
               </div>
             </div>
 

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import {
   Tender,
@@ -81,6 +81,32 @@ export default function App() {
   });
 
   const [roleToast, setRoleToast] = useState<{ role: string; name: string; title: string; desc: string } | null>(null);
+  const navigationReady = useRef(false);
+
+  useEffect(() => {
+    window.history.replaceState({ ...window.history.state, bidsureTab: activeTab }, '', window.location.href);
+    navigationReady.current = true;
+    const handlePopState = (event: PopStateEvent) => {
+      if (isCreateTenderModalOpen) {
+        setIsCreateTenderModalOpen(false);
+        return;
+      }
+      const previousTab = event.state?.bidsureTab as ActiveTab | undefined;
+      if (previousTab) setActiveTab(previousTab);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (!navigationReady.current || window.history.state?.bidsureTab === activeTab) return;
+    window.history.pushState({ bidsureTab: activeTab }, '', window.location.href);
+  }, [activeTab]);
+
+  const openCreateTender = () => {
+    window.history.pushState({ ...window.history.state, bidsureModal: 'create-tender' }, '', window.location.href);
+    setIsCreateTenderModalOpen(true);
+  };
 
   const roleCanUseTab = (tab: ActiveTab) => {
     if (tab === 'SOURCE_GATEWAY') {
@@ -192,14 +218,9 @@ export default function App() {
     try {
       await loginAsRole(user.role, email || user.email, password);
       setIsAuthenticated(true);
-      const updatedBidders = await fetchBidders();
-      if (Array.isArray(updatedBidders) && updatedBidders.length > 0) {
-        setBidders(updatedBidders);
-      }
-      const updatedAudits = await fetchAuditTrail();
-      if (Array.isArray(updatedAudits) && updatedAudits.length > 0) {
-        setAuditEvents(updatedAudits);
-      }
+      const [updatedBidders, updatedAudits] = await Promise.all([fetchBidders(), fetchAuditTrail()]);
+      if (Array.isArray(updatedBidders) && updatedBidders.length > 0) setBidders(updatedBidders);
+      if (Array.isArray(updatedAudits) && updatedAudits.length > 0) setAuditEvents(updatedAudits);
     } catch (e) {
       setIsAuthenticated(false);
       setActiveTab('LOGIN');
@@ -485,7 +506,7 @@ export default function App() {
               setSelectedBidderId(bId);
               setActiveTab('EVALUATION');
             }}
-            onOpenCreateTender={() => setIsCreateTenderModalOpen(true)}
+            onOpenCreateTender={openCreateTender}
             onOpenAdapters={() => setIsSourceGatewayModalOpen(true)}
           />
         )}
@@ -495,7 +516,7 @@ export default function App() {
             tenders={tenders}
             submissions={submissions}
             onSelectTender={() => setActiveTab('EVALUATION')}
-            onOpenCreateTender={() => setIsCreateTenderModalOpen(true)}
+            onOpenCreateTender={openCreateTender}
             canCreateTender={currentUser.role === 'PROCUREMENT_OFFICER'}
           />
         )}
@@ -608,7 +629,10 @@ export default function App() {
       {/* Create Tender Modal */}
       <CreateTenderModal
         isOpen={isCreateTenderModalOpen}
-        onClose={() => setIsCreateTenderModalOpen(false)}
+        onClose={() => {
+          setIsCreateTenderModalOpen(false);
+          if (window.history.state?.bidsureModal === 'create-tender') window.history.back();
+        }}
         onTenderCreated={handleTenderCreated}
       />
 

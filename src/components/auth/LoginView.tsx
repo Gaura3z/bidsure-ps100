@@ -17,7 +17,7 @@ import { User } from '../../types/index.ts';
 
 interface LoginViewProps {
   currentUser: User;
-  onLoginSuccess: (role: string, email?: string, password?: string) => void;
+  onLoginSuccess: (role: string, email?: string, password?: string) => void | Promise<void>;
   onNavigateToDashboard: () => void;
 }
 
@@ -38,6 +38,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [registrationRole, setRegistrationRole] = useState<'BIDDER_VENDOR' | 'COMPLIANCE_ANALYST'>('BIDDER_VENDOR');
   const [registrationStatus, setRegistrationStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [registrationBusy, setRegistrationBusy] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
 
   const demoPasswords: Record<string, string> = {
     PROCUREMENT_OFFICER: 'Officer@BidSure2026!',
@@ -55,10 +56,15 @@ export const LoginView: React.FC<LoginViewProps> = ({
     setPassword(demoPasswords[role]);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLoginSuccess(selectedRole, email, password);
-    onNavigateToDashboard();
+    setSigningIn(true);
+    try {
+      await onLoginSuccess(selectedRole, email, password);
+      onNavigateToDashboard();
+    } finally {
+      setSigningIn(false);
+    }
   };
 
   const handleSsoLogin = () => {
@@ -292,10 +298,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
             <button
               type="submit"
+              disabled={signingIn}
               className="w-full py-2.5 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer mt-2"
             >
-              <span>Sign In as {selectedRole.replace('_', ' ')}</span>
-              <ArrowRight className="w-4 h-4" />
+              <span>{signingIn ? 'Signing in securely…' : `Sign In as ${selectedRole.replace('_', ' ')}`}</span>
+              {!signingIn && <ArrowRight className="w-4 h-4" />}
             </button>
           </form>
 

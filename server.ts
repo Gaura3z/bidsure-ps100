@@ -360,9 +360,13 @@ app.post('/api/tenders', async (req: Request, res: Response) => {
   }
 
   const { tenderId, title, description, category, estimatedValue, submissionDeadline, requirements } = req.body;
+  const publishedTenderId = tenderId || `CPCL/IT/2026/${Math.floor(100 + Math.random() * 900)}`;
+  if (db.tenders.some((tender) => tender.tenderId.toLowerCase() === String(publishedTenderId).trim().toLowerCase())) {
+    return res.status(409).json({ error: `Tender ID ${publishedTenderId} is already in use. Change the Tender ID and try publishing again.` });
+  }
   const newTender: Tender = {
     id: `tender-${Date.now()}`,
-    tenderId: tenderId || `CPCL/IT/2026/${Math.floor(100 + Math.random() * 900)}`,
+    tenderId: String(publishedTenderId).trim(),
     title,
     description: description || 'Procurement requirement published on GeM portal.',
     category: category || 'Goods',
@@ -377,40 +381,49 @@ app.post('/api/tenders', async (req: Request, res: Response) => {
     updatedAt: new Date().toISOString(),
   };
 
-  db.tenders.unshift(newTender);
+  const newRequirements: TenderRequirement[] = Array.isArray(requirements) ? requirements.map((reqItem: any, idx: number) => ({
+    id: `req-${newTender.id}-${idx}`,
+    tenderId: newTender.id,
+    clauseNumber: reqItem.clauseNumber || `Clause ${idx + 1}.1`,
+    category: reqItem.category || 'STATUTORY',
+    title: reqItem.title,
+    description: reqItem.description,
+    isMandatory: reqItem.isMandatory ?? true,
+    isKnockout: reqItem.isKnockout ?? true,
+    thresholdType: reqItem.thresholdType || 'EQUALS',
+    thresholdValue: reqItem.thresholdValue || 'REQUIRED',
+    evidenceDocType: reqItem.evidenceDocType || 'Certificate',
+    sourceAdapter: reqItem.sourceAdapter || 'MANUAL',
+    severity: reqItem.severity || 'HIGH',
+    weight: reqItem.weight || 10,
+    ruleExpression: reqItem.ruleExpression || 'verified == true',
+    createdAt: new Date().toISOString(),
+  })) : [];
 
-  if (Array.isArray(requirements) && requirements.length > 0) {
-    requirements.forEach((reqItem: any, idx: number) => {
-      const newReq: TenderRequirement = {
-        id: `req-${Date.now()}-${idx}`,
-        tenderId: newTender.id,
-        clauseNumber: reqItem.clauseNumber || `Clause ${idx + 1}.1`,
-        category: reqItem.category || 'STATUTORY',
-        title: reqItem.title,
-        description: reqItem.description,
-        isMandatory: reqItem.isMandatory ?? true,
-        isKnockout: reqItem.isKnockout ?? true,
-        thresholdType: reqItem.thresholdType || 'EQUALS',
-        thresholdValue: reqItem.thresholdValue || 'REQUIRED',
-        evidenceDocType: reqItem.evidenceDocType || 'Certificate',
-        sourceAdapter: reqItem.sourceAdapter || 'MANUAL',
-        severity: reqItem.severity || 'HIGH',
-        weight: reqItem.weight || 10,
-        ruleExpression: reqItem.ruleExpression || 'verified == true',
-        createdAt: new Date().toISOString(),
-      };
-      db.requirements.push(newReq);
-    });
+  let tenderAuditId: string | undefined;
+  try {
+    const tenderAudit = logAuditEvent('TENDER_CREATED', 'TENDER', newTender.id, `Tender ${newTender.tenderId} created with ${newRequirements.length} requirements.`, user, undefined, false);
+    tenderAuditId = tenderAudit.id;
+    if (process.env.STORAGE_MODE === 'postgres') {
+      await persistTenderCreation(newTender, newRequirements, tenderAudit);
+    } else {
+      db.tenders.unshift(newTender);
+      db.requirements.push(...newRequirements);
+      await storage.save();
+    }
+    if (process.env.STORAGE_MODE === 'postgres') {
+      db.tenders.unshift(newTender);
+      db.requirements.push(...newRequirements);
+    }
+    res.status(201).json({ ...newTender, requirements: newRequirements });
+  } catch (error: any) {
+    if (tenderAuditId) db.auditEvents = db.auditEvents.filter((event) => event.id !== tenderAuditId);
+    console.error('[BIDSure API] Tender publish failed:', error?.message || error);
+    if (error?.code === '23505') {
+      return res.status(409).json({ error: 'This Tender ID or requirement already exists. Refresh the tender list, change the Tender ID, and try again.' });
+    }
+    res.status(503).json({ error: 'Tender could not be saved. The deployment database is temporarily unavailable; your tender was not published. Please retry in a moment.' });
   }
-
-  const tenderRequirements = db.requirements.filter((requirement) => requirement.tenderId === newTender.id);
-  const tenderAudit = logAuditEvent('TENDER_CREATED', 'TENDER', newTender.id, `Tender ${newTender.tenderId} created with ${requirements?.length || 0} requirements.`, user, undefined, false);
-  if (process.env.STORAGE_MODE === 'postgres') await persistTenderCreation(newTender, tenderRequirements, tenderAudit);
-  else await storage.save();
-  res.status(201).json({
-    ...newTender,
-    requirements: db.requirements.filter((requirement) => requirement.tenderId === newTender.id),
-  });
 });
 
 app.post('/api/tenders/:id/apply', async (req: Request, res: Response) => {

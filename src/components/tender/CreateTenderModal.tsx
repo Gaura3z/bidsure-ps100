@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
   FilePlus2,
@@ -9,7 +9,7 @@ import {
   FileText,
   Loader2,
 } from 'lucide-react';
-import { extractRequirementsAI, createTender } from '../../services/api.ts';
+import { extractRequirementsAI, createTender, fetchTenders } from '../../services/api.ts';
 import { Tender } from '../../types/index.ts';
 
 interface CreateTenderModalProps {
@@ -26,6 +26,14 @@ const localRequirementFallback = [
   { clauseNumber: 'Clause 7.1', category: 'OEM_AUTHORIZATION', title: 'OEM Authorization', description: 'Tender-specific authorization from the OEM.', isMandatory: true, isKnockout: true, evidenceDocType: 'OEM Manufacturer Authorization Letter', sourceAdapter: 'MANUAL' },
   { clauseNumber: 'Clause 10.1', category: 'DEBARMENT_CHECK', title: 'Non-Blacklisting Declaration', description: 'Bidder must not be debarred or blacklisted.', isMandatory: true, isKnockout: true, evidenceDocType: 'Non-Blacklisting Declaration', sourceAdapter: 'DEBARMENT' },
 ];
+
+function nextAvailableTenderId(tenders: Tender[]) {
+  const highestUsedId = tenders.reduce((highest, tender) => {
+    const match = tender.tenderId.match(/^CPCL\/IT\/2026\/(\d+)$/i);
+    return match ? Math.max(highest, Number(match[1])) : highest;
+  }, 0);
+  return `CPCL/IT/2026/${String(highestUsedId + 1).padStart(3, '0')}`;
+}
 
 export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
   isOpen,
@@ -49,6 +57,17 @@ export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [publishError, setPublishError] = useState('');
   const [extractionError, setExtractionError] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    fetchTenders()
+      .then((tenders) => {
+        if (!cancelled) setTenderId(nextAvailableTenderId(tenders));
+      })
+      .catch((error) => console.warn('Could not prepare the next tender ID:', error));
+    return () => { cancelled = true; };
+  }, [isOpen]);
 
   const estimatedValue = Math.max(0, Number(estimatedInput || 0) * (
     estimatedUnit === 'CRORES' ? 10000000 : estimatedUnit === 'LAKHS' ? 100000 : 1

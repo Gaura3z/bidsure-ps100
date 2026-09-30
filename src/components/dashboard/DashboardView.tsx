@@ -23,6 +23,7 @@ interface DashboardViewProps {
   submissions: BidSubmission[];
   bidders: Bidder[];
   onSelectTender: (tenderId: string) => void;
+  onApplyTender?: (tenderId: string) => Promise<void>;
   onSelectBidder: (bidderId: string) => void;
   onOpenCreateTender: () => void;
   onOpenAdapters: () => void;
@@ -34,6 +35,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   submissions,
   bidders,
   onSelectTender,
+  onApplyTender,
   onSelectBidder,
   onOpenCreateTender,
   onOpenAdapters,
@@ -568,12 +570,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     )}
                   </td>
                   <td className="py-3.5 px-4 text-right">
-                    <button
-                      onClick={() => onSelectTender(tender.id)}
-                      className="text-xs font-semibold text-blue-700 hover:text-blue-800 bg-white hover:bg-blue-50 border border-blue-200 px-3 py-1 rounded-md transition-colors cursor-pointer"
-                    >
-                      View & Evaluate
-                    </button>
+                    {currentUser.role === 'BIDDER_VENDOR' ? (
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => void onApplyTender?.(tender.id)}
+                          className="text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 px-3 py-1 rounded-md transition-colors cursor-pointer"
+                        >
+                          {submissions.some((submission) => submission.tenderId === tender.id && submission.bidderId === 'bidder-01') ? 'Open Bid' : 'Apply'}
+                        </button>
+                        <button
+                          onClick={() => onSelectTender(tender.id)}
+                          className="text-xs font-semibold text-blue-700 hover:text-blue-800 bg-white hover:bg-blue-50 border border-blue-200 px-3 py-1 rounded-md transition-colors cursor-pointer"
+                        >
+                          View
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => onSelectTender(tender.id)}
+                        className="text-xs font-semibold text-blue-700 hover:text-blue-800 bg-white hover:bg-blue-50 border border-blue-200 px-3 py-1 rounded-md transition-colors cursor-pointer"
+                      >
+                        View & Evaluate
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

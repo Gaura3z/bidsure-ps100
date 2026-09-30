@@ -448,6 +448,7 @@ export default function App() {
       const submission = await applyForTender(tenderId);
       setSubmissions((previous) => [submission, ...previous.filter((item) => item.id !== submission.id)]);
       setSelectedTenderId(tenderId);
+      setActiveTab('EVALUATION');
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Unable to apply for this tender.');
     }
@@ -574,6 +575,7 @@ export default function App() {
               setSelectedTenderId(tenderId);
               setActiveTab('EVALUATION');
             }}
+            onApplyTender={handleApplyTender}
             onSelectBidder={(bId) => {
               setSelectedBidderId(bId);
               setActiveTab('EVALUATION');

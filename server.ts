@@ -408,7 +408,7 @@ app.post('/api/tenders', (req: Request, res: Response) => {
   });
 });
 
-app.post('/api/tenders/:id/apply', (req: Request, res: Response) => {
+app.post('/api/tenders/:id/apply', async (req: Request, res: Response) => {
   const actor = requireRole(req, res, ['BIDDER_VENDOR']);
   if (!actor) return;
   const tender = db.tenders.find((candidate) => candidate.id === req.params.id);
@@ -432,6 +432,7 @@ app.post('/api/tenders/:id/apply', (req: Request, res: Response) => {
   };
   db.submissions.unshift(submission);
   logAuditEvent('BID_SUBMITTED', 'BID_SUBMISSION', submission.id, `${actor.user.name} applied for tender ${tender.tenderId}.`, actor.user);
+  await storage.save();
   res.status(201).json({ success: true, submission });
 });
 

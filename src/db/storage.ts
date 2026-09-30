@@ -98,6 +98,7 @@ function getDefaultState(): DatabaseState {
 class StorageEngine {
   private state: DatabaseState;
   private readonly postgresMode: boolean;
+  private persistQueue: Promise<void> = Promise.resolve();
 
   constructor(initialState: DatabaseState, postgresMode: boolean) {
     this.state = initialState;
@@ -144,11 +145,15 @@ class StorageEngine {
     }
   }
 
-  public save() {
+  public save(): Promise<void> {
     if (this.postgresMode) {
-      void persistPostgresState(this.state).catch((err) => console.error('[BIDSure DB] PostgreSQL write error:', err));
+      this.persistQueue = this.persistQueue
+        .then(() => persistPostgresState(this.state))
+        .catch((err) => console.error('[BIDSure DB] PostgreSQL write error:', err));
+      return this.persistQueue;
     } else {
       this.saveDirect(this.state);
+      return Promise.resolve();
     }
   }
 

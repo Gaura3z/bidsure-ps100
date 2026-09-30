@@ -39,10 +39,22 @@ export function getActiveUserContext() {
   return { role: activeRole, userId: activeUserId };
 }
 
-async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
+async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit, timeoutMs = 20000): Promise<T> {
   // Authorization is carried by the HttpOnly session cookie issued by /auth/login.
   // Do not send mutable role/user headers from the browser.
-  const res = await fetch(input, { ...init, credentials: 'same-origin' });
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(input, { ...init, credentials: 'same-origin', signal: controller.signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('The secure service is waking up. Please try Sign In again in a few seconds.');
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
   const payload = await res.json().catch(() => null);
   if (!res.ok) {
     const message = payload && typeof payload.error === 'string' ? payload.error : `Request failed (${res.status})`;
@@ -56,7 +68,7 @@ export async function fetchHealth() {
 }
 
 export async function fetchSession() {
-  return requestJson(`${API_BASE}/session`);
+  return requestJson(`${API_BASE}/session`, undefined, 8000);
 }
 
 export async function loginAsRole(role: string, email?: string, password?: string) {

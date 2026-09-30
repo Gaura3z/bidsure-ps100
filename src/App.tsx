@@ -32,6 +32,7 @@ import {
   fetchAuditTrail,
   fetchSourceAdapters,
   fetchSession,
+  fetchHealth,
   runVerificationPipeline,
   overrideVerificationResult,
   recordOfficerDecision,
@@ -126,6 +127,8 @@ export default function App() {
   // Load live data from API if server is running
   useEffect(() => {
     async function loadInitialData() {
+      // Wake Render before the session request so a sleeping free instance is ready by the time the user submits login.
+      void fetchHealth().catch(() => undefined);
       try {
         const session: any = await fetchSession();
         if (session?.currentUser) {

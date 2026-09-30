@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import multer from 'multer';
 import { storage } from './src/db/storage.ts';
+import { persistBidApplication, persistBidEvidence, persistTenderCreation, persistVerification } from './src/db/postgresStorage.ts';
 import { aiProvider } from './src/services/aiProvider.ts';
 import { storeDocument } from './src/services/documentStorage.ts';
 import { extractTextWithConfiguredOcr, scanForMalware } from './src/services/documentPipeline.ts';
@@ -79,7 +80,8 @@ function logAuditEvent(
   entityId: string,
   summary: string,
   actor?: User,
-  details?: Record<string, any>
+  details?: Record<string, any>,
+  persist = true
 ) {
   const currentActor = actor || db.currentUser;
   const event: AuditEvent = {
@@ -97,7 +99,7 @@ function logAuditEvent(
     evidenceHash: details?.hash || Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
   };
   db.auditEvents.unshift(event);
-  storage.save();
+  if (persist) storage.save();
   return event;
 }
 
@@ -401,8 +403,10 @@ app.post('/api/tenders', async (req: Request, res: Response) => {
     });
   }
 
-  logAuditEvent('TENDER_CREATED', 'TENDER', newTender.id, `Tender ${newTender.tenderId} created with ${requirements?.length || 0} requirements.`);
-  await storage.save();
+  const tenderRequirements = db.requirements.filter((requirement) => requirement.tenderId === newTender.id);
+  const tenderAudit = logAuditEvent('TENDER_CREATED', 'TENDER', newTender.id, `Tender ${newTender.tenderId} created with ${requirements?.length || 0} requirements.`, user, undefined, false);
+  if (process.env.STORAGE_MODE === 'postgres') await persistTenderCreation(newTender, tenderRequirements, tenderAudit);
+  else await storage.save();
   res.status(201).json({
     ...newTender,
     requirements: db.requirements.filter((requirement) => requirement.tenderId === newTender.id),
@@ -450,8 +454,9 @@ app.post('/api/tenders/:id/apply', async (req: Request, res: Response) => {
       aiExplanation: 'Evidence is required before compliance can be assessed.',
     });
   }
-  logAuditEvent('BID_SUBMITTED', 'BID_SUBMISSION', submission.id, `${actor.user.name} applied for tender ${tender.tenderId}.`, actor.user);
-  await storage.save();
+  const auditEvent = logAuditEvent('BID_SUBMITTED', 'BID_SUBMISSION', submission.id, `${actor.user.name} applied for tender ${tender.tenderId}.`, actor.user, undefined, false);
+  if (process.env.STORAGE_MODE === 'postgres') await persistBidApplication(submission, db.verificationResults.filter((result) => result.bidSubmissionId === submission.id), auditEvent);
+  else await storage.save();
   res.status(201).json({ success: true, submission });
 });
 
@@ -771,13 +776,17 @@ Output a structured JSON response:
     recommendationRecord,
   ];
 
-  logAuditEvent(
+  const verificationAudit = logAuditEvent(
     'VERIFICATION_EXECUTED',
     'VERIFICATION',
     submission.id,
-    `AI verification and deterministic rules engine completed. Score: ${finalScore}%, Risk: ${submission.riskLevel}.`
+    `AI verification and deterministic rules engine completed. Score: ${finalScore}%, Risk: ${submission.riskLevel}.`,
+    undefined,
+    undefined,
+    false
   );
-  await storage.save();
+  if (process.env.STORAGE_MODE === 'postgres') await persistVerification(submission, results, scoreRecord, recommendationRecord, verificationAudit);
+  else await storage.save();
 
   res.json({
     submission,
@@ -896,16 +905,18 @@ app.post('/api/bidders/respond-clarification', upload.single('file'), async (req
   submission.status = 'REVIEW_REQUIRED';
   submission.riskLevel = 'MEDIUM';
 
-  logAuditEvent(
+  const uploadAudit = logAuditEvent(
     'CLARIFICATION_SUBMITTED',
     'BID_SUBMISSION',
     submission.id,
     `Bidder ${user.name} uploaded evidence "${newDoc.fileName}" for ${newDoc.docType}. Evidence is pending officer review.`,
     user,
-    { documentId: newDoc.id, docType: newDoc.docType, remarks }
+    { documentId: newDoc.id, docType: newDoc.docType, remarks },
+    false
   );
 
-  await storage.save();
+  if (process.env.STORAGE_MODE === 'postgres') await persistBidEvidence(newDoc, submission, matchingResult, uploadAudit);
+  else await storage.save();
   res.json({
     success: true,
     submission,

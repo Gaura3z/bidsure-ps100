@@ -1,5 +1,6 @@
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
+import { eq } from 'drizzle-orm';
 import { pgSchema } from './pgSchema.ts';
 import type { DatabaseState } from './storage.ts';
 
@@ -12,6 +13,59 @@ const sqlClient = postgres(process.env.DATABASE_URL!, {
   connect_timeout: 10,
 });
 const db = drizzle(sqlClient);
+
+export async function persistBidApplication(submission: any, results: any[], auditEvent: any) {
+  await db.transaction(async (tx) => {
+    await tx.insert(pgSchema.bidSubmissions).values(submission);
+    if (results.length) await tx.insert(pgSchema.verificationResults).values(results);
+    await tx.insert(pgSchema.auditEvents).values(auditEvent);
+  });
+}
+
+export async function persistTenderCreation(tender: any, requirements: any[], auditEvent: any) {
+  await db.transaction(async (tx) => {
+    await tx.insert(pgSchema.tenders).values(tender);
+    if (requirements.length) await tx.insert(pgSchema.tenderRequirements).values(requirements);
+    await tx.insert(pgSchema.auditEvents).values(auditEvent);
+  });
+}
+
+export async function persistBidEvidence(document: any, submission: any, result: any, auditEvent: any) {
+  await db.transaction(async (tx) => {
+    await tx.insert(pgSchema.bidDocuments).values({ ...document, storagePath: document.storagePath ?? null });
+    if (result) {
+      await tx.update(pgSchema.verificationResults).set(result).where(eq(pgSchema.verificationResults.id, result.id));
+    }
+    await tx.update(pgSchema.bidSubmissions).set({ status: submission.status, riskLevel: submission.riskLevel }).where(eq(pgSchema.bidSubmissions.id, submission.id));
+    await tx.insert(pgSchema.auditEvents).values(auditEvent);
+  });
+}
+
+export async function persistVerification(submission: any, results: any[], score: any, recommendation: any, auditEvent: any) {
+  await db.transaction(async (tx) => {
+    for (const result of results) {
+      await tx.update(pgSchema.verificationResults).set(result).where(eq(pgSchema.verificationResults.id, result.id));
+    }
+    await tx.update(pgSchema.bidSubmissions).set({
+      status: submission.status,
+      overallScore: submission.overallScore,
+      riskLevel: submission.riskLevel,
+      checksPassed: submission.checksPassed,
+      checksReview: submission.checksReview,
+      checksFailed: submission.checksFailed,
+      verifiedAt: submission.verifiedAt,
+    }).where(eq(pgSchema.bidSubmissions.id, submission.id));
+    await tx.insert(pgSchema.complianceScores).values(score).onConflictDoUpdate({
+      target: pgSchema.complianceScores.id,
+      set: score,
+    });
+    await tx.insert(pgSchema.aiRecommendations).values(recommendation).onConflictDoUpdate({
+      target: pgSchema.aiRecommendations.id,
+      set: recommendation,
+    });
+    await tx.insert(pgSchema.auditEvents).values(auditEvent);
+  });
+}
 
 export async function loadPostgresState(): Promise<DatabaseState> {
   // Supabase's transaction pooler can return an inconsistent driver row when

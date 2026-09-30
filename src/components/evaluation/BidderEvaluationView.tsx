@@ -159,7 +159,7 @@ export const BidderEvaluationView: React.FC<BidderEvaluationViewProps> = ({
                 className="px-3.5 py-2 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-1.5 shadow-sm transition-all cursor-pointer animate-pulse"
               >
                 <Upload className="w-4 h-4" />
-                <span>Respond to Clarification & Upload Evidence</span>
+                <span>Upload Required Documents & Evidence</span>
               </button>
             ) : (
               <div
@@ -570,7 +570,7 @@ export const BidderEvaluationView: React.FC<BidderEvaluationViewProps> = ({
                     <li key={requirement.id}>{requirement.evidenceDocType} <span className="text-blue-700">({requirement.clauseNumber})</span></li>
                   ))}
                 </ul>
-                <p className="mt-2 text-xs text-blue-800">Use “Respond to Clarification & Upload Evidence” above to upload the first supporting document. The file is linked to this tender submission.</p>
+                <p className="mt-2 text-xs text-blue-800">Choose “Upload Required Documents & Evidence” to attach documents to this tender bid. Files are scanned and queued for review.</p>
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -707,6 +707,8 @@ export const BidderEvaluationView: React.FC<BidderEvaluationViewProps> = ({
         onClose={() => setIsClarificationModalOpen(false)}
         bidder={currentBidder}
         submission={currentSubmission}
+        tender={currentTender}
+        requiredDocuments={requirements.filter((requirement) => requirement.tenderId === currentTender.id).map((requirement) => requirement.evidenceDocType)}
         onSubmitResponse={async (data) => {
           if (onRespondClarification) {
             await onRespondClarification({

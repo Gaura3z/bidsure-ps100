@@ -510,12 +510,13 @@ export default function App() {
         action: 'CLARIFICATION_RESPONSE_SUBMITTED',
         entityType: 'DOCUMENT',
         entityId: data.submissionId,
-        summary: `Vendor submitted clarification response: "${data.documentTitle}". MSE turnover exemption claim filed under PPP 2012.`,
+        summary: `Vendor uploaded evidence: "${data.documentTitle}" for tender review.`,
         ruleVersion: 'v2.4-2026',
       };
       setAuditEvents((prev) => [newAudit, ...prev]);
     } catch (e) {
       console.error('Failed to submit clarification:', e);
+      throw e;
     }
   };
 

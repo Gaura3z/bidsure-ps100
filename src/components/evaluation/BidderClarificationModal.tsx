@@ -11,13 +11,15 @@ import {
   Send,
   Sparkles,
 } from 'lucide-react';
-import { Bidder, BidSubmission } from '../../types/index.ts';
+import { Bidder, BidSubmission, Tender } from '../../types/index.ts';
 
 interface BidderClarificationModalProps {
   isOpen: boolean;
   onClose: () => void;
   bidder: Bidder;
   submission: BidSubmission;
+  tender: Tender;
+  requiredDocuments: string[];
   onSubmitResponse: (data: {
     documentTitle: string;
     docType: string;
@@ -31,13 +33,13 @@ export const BidderClarificationModal: React.FC<BidderClarificationModalProps> =
   onClose,
   bidder,
   submission,
+  tender,
+  requiredDocuments,
   onSubmitResponse,
 }) => {
-  const [selectedDocType, setSelectedDocType] = useState('MSE Turnover Exemption Certificate (PPP 2012)');
+  const [selectedDocType, setSelectedDocType] = useState(requiredDocuments[0] || 'Supporting Document');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [remarks, setRemarks] = useState(
-    'M/s ABC Technologies Pvt Ltd is registered as a Micro & Small Enterprise (MSE) under Udyam Registration UDYAM-MH-12-0012345. Under Section 4 of the Public Procurement Policy for MSEs Order 2012, we respectfully claim full exemption from the prior turnover and past experience criteria for this CPCL tender.'
-  );
+  const [remarks, setRemarks] = useState('Submitting the requested evidence for this tender.');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -81,9 +83,9 @@ export const BidderClarificationModal: React.FC<BidderClarificationModalProps> =
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold">Vendor Clarification & Evidence Submission</span>
+                <span className="text-sm font-bold">Bid Documents & Evidence Upload</span>
                 <span className="text-[10px] font-mono bg-emerald-800 text-emerald-200 px-2 py-0.5 rounded font-semibold">
-                  Tender: CPCL/IT/2026/042
+                  Tender: {tender.tenderId}
                 </span>
               </div>
               <p className="text-xs text-emerald-200 mt-0.5">
@@ -102,20 +104,8 @@ export const BidderClarificationModal: React.FC<BidderClarificationModalProps> =
 
         {/* Modal Body */}
         <div className="p-6 space-y-5 overflow-y-auto flex-1">
-          {/* Formal Query Box from CPCL */}
-          <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 space-y-2 text-xs">
-            <div className="flex items-center justify-between text-amber-950 font-bold">
-              <div className="flex items-center gap-1.5">
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
-                <span>Formal Query from CPCL Procurement Officer: Rajesh Kumar</span>
-              </div>
-              <span className="text-[11px] font-mono bg-amber-100 text-amber-900 px-2 py-0.5 rounded">
-                Clause 5.2 • Turnover Deficit
-              </span>
-            </div>
-            <p className="text-slate-700 leading-relaxed">
-              "The audited turnover in CA Certificate is ₹3.80 Cr against the required ₹5.00 Cr. In accordance with GeM guidelines and Public Procurement Policy for MSEs Order 2012, please provide your MSE Turnover Relaxation Certificate with valid Udyam registration."
-            </p>
+          <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-950">
+            Upload a separate PDF or image for each requested document. Each file will be linked to bid {submission.submissionRef} and remain pending review until the compliance team checks it.
           </div>
 
           {isSuccess ? (
@@ -123,7 +113,7 @@ export const BidderClarificationModal: React.FC<BidderClarificationModalProps> =
               <div className="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center mx-auto shadow-md">
                 <CheckCircle2 className="w-7 h-7" />
               </div>
-              <h3 className="text-base font-bold text-emerald-950">Clarification Response Submitted!</h3>
+              <h3 className="text-base font-bold text-emerald-950">Document Submitted!</h3>
               <p className="text-xs text-emerald-800 max-w-md mx-auto leading-relaxed">
                 Your evidence and formal justification have been recorded and forwarded to the CPCL Tender Committee for officer review.
               </p>
@@ -141,18 +131,9 @@ export const BidderClarificationModal: React.FC<BidderClarificationModalProps> =
                   onChange={(e) => setSelectedDocType(e.target.value)}
                   className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold focus:bg-white focus:outline-hidden"
                 >
-                  <option value="MSE Turnover Exemption Certificate (PPP 2012)">
-                    MSE Turnover Relaxation Certificate (Public Procurement Policy 2012)
-                  </option>
-                  <option value="Udyam Enterprise Registration Certificate">
-                    Udyam MSME Registration Certificate (UDYAM-MH-12-0012345)
-                  </option>
-                  <option value="Audited Balance Sheet & CA Net Worth Certificate">
-                    Updated Audited Financial Statement with Annexures
-                  </option>
-                  <option value="OEM Authorization Manufacturer Clarification">
-                    Manufacturer Support Undertaking Letter with 5-Yr Warranty
-                  </option>
+                  {[...new Set([...requiredDocuments, 'MSE Turnover Exemption Certificate', 'Supporting Document'])].map((documentType) => (
+                    <option key={documentType} value={documentType}>{documentType}</option>
+                  ))}
                 </select>
               </div>
 
@@ -194,7 +175,7 @@ export const BidderClarificationModal: React.FC<BidderClarificationModalProps> =
               {/* Written Justification Remarks */}
               <div>
                 <label className="block text-slate-700 font-bold mb-1">
-                  Formal Response Remarks to Procurement Committee <span className="text-rose-600">*</span>
+                  Document notes for the review team
                 </label>
                 <textarea
                   rows={4}

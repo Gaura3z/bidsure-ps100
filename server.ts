@@ -347,7 +347,7 @@ app.get('/api/tenders/:id', (req: Request, res: Response) => {
   res.json({ tender, requirements, submissions });
 });
 
-app.post('/api/tenders', (req: Request, res: Response) => {
+app.post('/api/tenders', async (req: Request, res: Response) => {
   const actor = requireRole(req, res, ['PROCUREMENT_OFFICER']);
   if (!actor) return;
   const { user } = actor;
@@ -402,6 +402,7 @@ app.post('/api/tenders', (req: Request, res: Response) => {
   }
 
   logAuditEvent('TENDER_CREATED', 'TENDER', newTender.id, `Tender ${newTender.tenderId} created with ${requirements?.length || 0} requirements.`);
+  await storage.save();
   res.status(201).json({
     ...newTender,
     requirements: db.requirements.filter((requirement) => requirement.tenderId === newTender.id),
@@ -431,6 +432,24 @@ app.post('/api/tenders/:id/apply', async (req: Request, res: Response) => {
     submittedAt: new Date().toISOString(),
   };
   db.submissions.unshift(submission);
+  const tenderRequirements = db.requirements.filter((requirement) => requirement.tenderId === tender.id);
+  for (const requirement of tenderRequirements) {
+    db.verificationResults.push({
+      id: `result-${submission.id}-${requirement.id}`,
+      bidSubmissionId: submission.id,
+      requirementId: requirement.id,
+      status: 'UNVERIFIED',
+      extractedValue: 'Document not submitted',
+      requiredValue: requirement.evidenceDocType,
+      sourceType: requirement.sourceAdapter === 'MANUAL' ? 'MANUAL' : 'MOCK',
+      sourceAdapter: requirement.sourceAdapter,
+      sourceTimestamp: new Date().toISOString(),
+      ruleVersion: tender.ruleVersion,
+      isKnockoutTriggered: false,
+      officerOverridden: false,
+      aiExplanation: 'Evidence is required before compliance can be assessed.',
+    });
+  }
   logAuditEvent('BID_SUBMITTED', 'BID_SUBMISSION', submission.id, `${actor.user.name} applied for tender ${tender.tenderId}.`, actor.user);
   await storage.save();
   res.status(201).json({ success: true, submission });
@@ -757,7 +776,7 @@ Output a structured JSON response:
     submission.id,
     `AI verification and deterministic rules engine completed. Score: ${finalScore}%, Risk: ${submission.riskLevel}.`
   );
-  storage.save();
+  await storage.save();
 
   res.json({
     submission,
@@ -774,7 +793,7 @@ app.post('/api/bidders/respond-clarification', upload.single('file'), async (req
   const actor = requireRole(req, res, ['BIDDER_VENDOR']);
   if (!actor) return;
   const { user } = actor;
-  const { submissionId = 'sub-01', documentTitle, docType, remarks } = req.body;
+  const { submissionId, documentTitle, docType, remarks } = req.body;
 
   const submission = db.submissions.find((s) => s.id === submissionId);
   if (!submission) return res.status(404).json({ error: 'Submission not found' });
@@ -859,9 +878,19 @@ app.post('/api/bidders/respond-clarification', upload.single('file'), async (req
   db.documents.push(newDoc);
 
   // Keep the existing compliance result unchanged until an officer reviews the evidence.
-  const turnoverResult = db.verificationResults.find(
-    (r) => r.bidSubmissionId === submission.id && (r.requirementId === 'req-05' || r.requiredValue.includes('50000000'))
+  const matchingResult = db.verificationResults.find(
+    (result) => result.bidSubmissionId === submission.id &&
+      (result.requiredValue.toLowerCase().includes(String(docType || '').toLowerCase()) ||
+       String(docType || '').toLowerCase().includes(result.requiredValue.toLowerCase()))
   );
+  if (matchingResult) {
+    matchingResult.documentId = newDoc.id;
+    matchingResult.extractedValue = `Evidence uploaded: ${newDoc.fileName}`;
+    matchingResult.status = 'NEEDS_REVIEW';
+    matchingResult.sourceType = 'MANUAL';
+    matchingResult.sourceTimestamp = new Date().toISOString();
+    matchingResult.aiExplanation = 'Evidence is stored and awaits OCR and officer review.';
+  }
 
   submission.status = 'REVIEW_REQUIRED';
   submission.riskLevel = 'MEDIUM';
@@ -870,17 +899,17 @@ app.post('/api/bidders/respond-clarification', upload.single('file'), async (req
     'CLARIFICATION_SUBMITTED',
     'BID_SUBMISSION',
     submission.id,
-    `Bidder ${user.name} uploaded clarification document "${newDoc.fileName}" claiming MSE turnover exemption under Public Procurement Policy 2012. Evidence is pending officer review.`,
+    `Bidder ${user.name} uploaded evidence "${newDoc.fileName}" for ${newDoc.docType}. Evidence is pending officer review.`,
     user,
     { documentId: newDoc.id, docType: newDoc.docType, remarks }
   );
 
-  storage.save();
+  await storage.save();
   res.json({
     success: true,
     submission,
     document: newDoc,
-    turnoverResult,
+    turnoverResult: matchingResult,
     evidenceReview,
     message: 'Clarification response and evidence uploaded successfully. It is pending procurement officer review.',
   });

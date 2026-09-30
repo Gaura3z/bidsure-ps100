@@ -263,9 +263,14 @@ export default function App() {
     try {
       await loginAsRole(user.role, email || user.email, password);
       setIsAuthenticated(true);
-      const [updatedBidders, updatedAudits] = await Promise.all([fetchBidders(), fetchAuditTrail()]);
+      const [updatedBidders, updatedAudits, updatedSubmissions] = await Promise.all([
+        fetchBidders(),
+        fetchAuditTrail(),
+        fetchSubmissions(),
+      ]);
       if (Array.isArray(updatedBidders) && updatedBidders.length > 0) setBidders(updatedBidders);
       if (Array.isArray(updatedAudits) && updatedAudits.length > 0) setAuditEvents(updatedAudits);
+      if (Array.isArray(updatedSubmissions)) setSubmissions(updatedSubmissions);
     } catch (e) {
       setIsAuthenticated(false);
       setActiveTab('LOGIN');

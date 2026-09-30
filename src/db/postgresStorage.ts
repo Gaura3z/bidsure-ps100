@@ -3,27 +3,35 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import { pgSchema } from './pgSchema.ts';
 import type { DatabaseState } from './storage.ts';
 
-const sqlClient = postgres(process.env.DATABASE_URL!, { max: 5 });
+// Supabase's transaction pooler does not support session-bound prepared
+// statements reliably. Disable them so startup and concurrent reads work on
+// Render's IPv4-compatible pooler connection.
+const sqlClient = postgres(process.env.DATABASE_URL!, {
+  max: 5,
+  prepare: false,
+  connect_timeout: 10,
+});
 const db = drizzle(sqlClient);
 
 export async function loadPostgresState(): Promise<DatabaseState> {
-  const [organizationRows, users, tenders, requirements, bidders, submissions, documents, extractions, sourceRecords, adapterModeRows, verificationResults, scores, recommendations, decisions, auditEvents] = await Promise.all([
-    db.select().from(pgSchema.organizations),
-    db.select().from(pgSchema.users),
-    db.select().from(pgSchema.tenders),
-    db.select().from(pgSchema.tenderRequirements),
-    db.select().from(pgSchema.bidders),
-    db.select().from(pgSchema.bidSubmissions),
-    db.select().from(pgSchema.bidDocuments),
-    db.select().from(pgSchema.documentExtractions),
-    db.select().from(pgSchema.sourceRecords),
-    db.select().from(pgSchema.sourceAdapterModes),
-    db.select().from(pgSchema.verificationResults),
-    db.select().from(pgSchema.complianceScores),
-    db.select().from(pgSchema.aiRecommendations),
-    db.select().from(pgSchema.officerDecisions),
-    db.select().from(pgSchema.auditEvents),
-  ]);
+  // Supabase's transaction pooler can return an inconsistent driver row when
+  // many Drizzle queries are opened at once during Render startup. Loading the
+  // small demo state sequentially keeps the startup path deterministic.
+  const organizationRows = await db.select().from(pgSchema.organizations);
+  const users = await db.select().from(pgSchema.users);
+  const tenders = await db.select().from(pgSchema.tenders);
+  const requirements = await db.select().from(pgSchema.tenderRequirements);
+  const bidders = await db.select().from(pgSchema.bidders);
+  const submissions = await db.select().from(pgSchema.bidSubmissions);
+  const documents = await db.select().from(pgSchema.bidDocuments);
+  const extractions = await db.select().from(pgSchema.documentExtractions);
+  const sourceRecords = await db.select().from(pgSchema.sourceRecords);
+  const adapterModeRows = await db.select().from(pgSchema.sourceAdapterModes);
+  const verificationResults = await db.select().from(pgSchema.verificationResults);
+  const scores = await db.select().from(pgSchema.complianceScores);
+  const recommendations = await db.select().from(pgSchema.aiRecommendations);
+  const decisions = await db.select().from(pgSchema.officerDecisions);
+  const auditEvents = await db.select().from(pgSchema.auditEvents);
 
   if (!organizationRows[0] || !users[0]) {
     throw new Error('Supabase database is reachable but has no seeded BidSure organization/users. Run npm run db:seed first.');

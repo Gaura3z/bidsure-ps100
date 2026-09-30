@@ -405,6 +405,33 @@ app.post('/api/tenders', (req: Request, res: Response) => {
   res.status(201).json(newTender);
 });
 
+app.post('/api/tenders/:id/apply', (req: Request, res: Response) => {
+  const actor = requireRole(req, res, ['BIDDER_VENDOR']);
+  if (!actor) return;
+  const tender = db.tenders.find((candidate) => candidate.id === req.params.id);
+  if (!tender) return res.status(404).json({ error: 'Tender not found.' });
+  const bidderId = actor.user?.id === 'user-bidder-01' ? 'bidder-01' : undefined;
+  if (!bidderId) return res.status(403).json({ error: 'Your bidder profile is not linked to a vendor record.' });
+  const existing = db.submissions.find((submission) => submission.tenderId === tender.id && submission.bidderId === bidderId);
+  if (existing) return res.json({ success: true, submission: existing, alreadyApplied: true });
+  const submission: BidSubmission = {
+    id: `sub-${Date.now()}`,
+    tenderId: tender.id,
+    bidderId,
+    submissionRef: `BID/${new Date().getFullYear()}/${tender.tenderId.replace(/[^A-Z0-9]+/gi, '-')}-01`,
+    status: 'UNDER_VERIFICATION',
+    overallScore: 0,
+    riskLevel: 'MEDIUM',
+    checksPassed: 0,
+    checksReview: 0,
+    checksFailed: 0,
+    submittedAt: new Date().toISOString(),
+  };
+  db.submissions.unshift(submission);
+  logAuditEvent('BID_SUBMITTED', 'BID_SUBMISSION', submission.id, `${actor.user.name} applied for tender ${tender.tenderId}.`, actor.user);
+  res.status(201).json({ success: true, submission });
+});
+
 // AI Requirement Clause Extraction using Gemini API
 app.post('/api/tenders/extract-requirements', async (req: Request, res: Response) => {
   const actor = requireRole(req, res, ['PROCUREMENT_OFFICER', 'COMPLIANCE_ANALYST']);

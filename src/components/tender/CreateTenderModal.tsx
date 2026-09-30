@@ -36,7 +36,8 @@ export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
   const [title, setTitle] = useState('High-Density Server & SAN Storage Cluster Procurement');
   const [tenderId, setTenderId] = useState('CPCL/IT/2026/089');
   const [category, setCategory] = useState<'Goods' | 'Works' | 'Services' | 'Consultancy'>('Goods');
-  const [estimatedValue, setEstimatedValue] = useState<number>(65000000); // ₹6.5 Cr
+  const [estimatedInput, setEstimatedInput] = useState('6.5');
+  const [estimatedUnit, setEstimatedUnit] = useState<'RUPEES' | 'LAKHS' | 'CRORES'>('CRORES');
   const [deadline, setDeadline] = useState('2026-11-20');
   const [tenderDocumentText, setTenderDocumentText] = useState(
     'Procurement of Enterprise Hyperconverged Infrastructure for CPCL Data Centre. Bidders must have active GSTIN, valid PAN, minimum 3 years CPSE experience, audited turnover >= 5 Crore for last 3 years with CA UDIN, and tender-specific OEM Manufacturer Authorization with 5-year 24x7 onsite warranty.'
@@ -47,6 +48,10 @@ export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
   const [newDocument, setNewDocument] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [extractionError, setExtractionError] = useState('');
+
+  const estimatedValue = Math.max(0, Number(estimatedInput || 0) * (
+    estimatedUnit === 'CRORES' ? 10000000 : estimatedUnit === 'LAKHS' ? 100000 : 1
+  ));
 
   if (!isOpen) return null;
 
@@ -206,12 +211,22 @@ export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-slate-700 font-semibold mb-1">Estimated Value (INR)</label>
-                <input
-                  type="number"
-                  value={estimatedValue}
-                  onChange={(e) => setEstimatedValue(Number(e.target.value))}
-                  className="w-full p-2.5 bg-white border border-slate-300 rounded-lg font-mono text-xs"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={estimatedInput}
+                    onChange={(e) => setEstimatedInput(e.target.value)}
+                    placeholder="e.g. 5"
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-lg font-mono text-xs"
+                  />
+                  <select value={estimatedUnit} onChange={(e) => setEstimatedUnit(e.target.value as typeof estimatedUnit)} className="p-2.5 bg-white border border-slate-300 rounded-lg text-xs">
+                    <option value="CRORES">Crore</option>
+                    <option value="LAKHS">Lakh</option>
+                    <option value="RUPEES">₹</option>
+                  </select>
+                </div>
                 <span className="text-[11px] text-slate-500 mt-0.5 block">
                   ₹{(estimatedValue / 10000000).toFixed(2)} Crore
                 </span>

@@ -41,7 +41,9 @@ interface BidderEvaluationViewProps {
   bidders: Bidder[];
   submissions: BidSubmission[];
   selectedBidderId: string;
+  selectedTenderId?: string;
   onSelectBidder: (id: string) => void;
+  onApplyTender?: (tenderId: string) => Promise<void>;
   requirements: TenderRequirement[];
   verificationResults: VerificationResult[];
   documents: BidDocument[];
@@ -57,7 +59,9 @@ export const BidderEvaluationView: React.FC<BidderEvaluationViewProps> = ({
   bidders,
   submissions,
   selectedBidderId,
+  selectedTenderId,
   onSelectBidder,
+  onApplyTender,
   requirements,
   verificationResults,
   documents,
@@ -73,8 +77,8 @@ export const BidderEvaluationView: React.FC<BidderEvaluationViewProps> = ({
   const [isClarificationModalOpen, setIsClarificationModalOpen] = useState(false);
 
   const currentBidder = bidders.find((b) => b.id === selectedBidderId) || bidders[0];
-  const currentSubmission = submissions.find((s) => s.bidderId === currentBidder.id) || submissions[0];
-  const currentTender = tenders.find((t) => t.id === currentSubmission?.tenderId) || tenders[0];
+  const currentTender = tenders.find((t) => t.id === selectedTenderId) || tenders.find((t) => t.id === submissions.find((s) => s.bidderId === currentBidder.id)?.tenderId) || tenders[0];
+  const currentSubmission = submissions.find((s) => s.bidderId === currentBidder.id && s.tenderId === currentTender?.id);
 
   const bidderDocuments = documents.filter((d) => d.bidderId === currentBidder.id);
   const bidderResults = verificationResults.filter((r) => r.bidSubmissionId === currentSubmission?.id);
@@ -83,6 +87,20 @@ export const BidderEvaluationView: React.FC<BidderEvaluationViewProps> = ({
   const passedCount = bidderResults.filter((r) => r.status === 'PASS').length;
   const reviewCount = bidderResults.filter((r) => r.status === 'NEEDS_REVIEW').length;
   const failedCount = bidderResults.filter((r) => r.status === 'FAIL').length;
+
+  if (!currentSubmission) {
+    return (
+      <div className="max-w-3xl mx-auto rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+        <h2 className="text-xl font-bold text-slate-900">{currentTender?.title || 'Tender application'}</h2>
+        <p className="mt-2 text-sm text-slate-600">You have not applied for this tender yet. Apply to create your bid workspace and upload the required documents.</p>
+        {currentTender && currentUser.role === 'BIDDER_VENDOR' && onApplyTender && (
+          <button onClick={() => void onApplyTender(currentTender.id)} className="mt-6 rounded-lg bg-blue-700 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800">
+            Apply for this tender
+          </button>
+        )}
+      </div>
+    );
+  }
 
   const handleOpenEvidence = (result: VerificationResult) => {
     setEvidenceModalResult(result);

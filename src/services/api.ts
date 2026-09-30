@@ -103,6 +103,14 @@ export async function createTender(tenderData: Partial<Tender> & { requirements:
   });
 }
 
+export async function applyForTender(tenderId: string): Promise<BidSubmission> {
+  const result = await requestJson<{ submission: BidSubmission }>(`${API_BASE}/tenders/${encodeURIComponent(tenderId)}/apply`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  return result.submission;
+}
+
 export async function extractRequirementsAI(tenderDocumentText: string, tenderTitle: string): Promise<RequirementExtractionResponse> {
   return requestJson<RequirementExtractionResponse>(`${API_BASE}/tenders/extract-requirements`, {
     method: 'POST',

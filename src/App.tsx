@@ -40,6 +40,7 @@ import {
   loginAsRole,
   logout,
   respondToClarification,
+  applyForTender,
 } from './services/api.ts';
 import { Navbar } from './components/common/Navbar.tsx';
 import { GovNoticeBanner } from './components/common/GovNoticeBanner.tsx';
@@ -60,6 +61,7 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState('');
   const [tenders, setTenders] = useState<Tender[]>(initialTenders);
+  const [selectedTenderId, setSelectedTenderId] = useState<string | undefined>(undefined);
   const [bidders, setBidders] = useState<Bidder[]>(initialBidders);
   const [submissions, setSubmissions] = useState<BidSubmission[]>(initialSubmissions);
   const [documents, setDocuments] = useState<BidDocument[]>(initialDocuments);
@@ -180,6 +182,28 @@ export default function App() {
 
     loadInitialData();
   }, []);
+
+  // Keep published tenders current for officers and bidders who leave the app open.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const refreshTenders = async () => {
+      try {
+        const latest = await fetchTenders();
+        if (Array.isArray(latest)) setTenders(latest);
+      } catch (_) {
+        // Keep the last known data if the service is waking up or temporarily unavailable.
+      }
+    };
+    const interval = window.setInterval(refreshTenders, 15000);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void refreshTenders();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [isAuthenticated]);
 
   // Switch demo user
   const handleSwitchUser = async (role: string, email?: string, password?: string) => {
@@ -402,6 +426,7 @@ export default function App() {
   // New tender creation callback
   const handleTenderCreated = (newTender: Tender) => {
     setTenders((prev) => [newTender, ...prev]);
+    setSelectedTenderId(newTender.id);
 
     const newAudit: AuditEvent = {
       id: `aud-${Date.now()}`,
@@ -416,6 +441,16 @@ export default function App() {
       ruleVersion: 'v2.4-2026',
     };
     setAuditEvents((prev) => [newAudit, ...prev]);
+  };
+
+  const handleApplyTender = async (tenderId: string) => {
+    try {
+      const submission = await applyForTender(tenderId);
+      setSubmissions((previous) => [submission, ...previous.filter((item) => item.id !== submission.id)]);
+      setSelectedTenderId(tenderId);
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Unable to apply for this tender.');
+    }
   };
 
   // Vendor Clarification Response handler
@@ -535,7 +570,8 @@ export default function App() {
             tenders={tenders}
             submissions={submissions}
             bidders={bidders}
-            onSelectTender={() => {
+            onSelectTender={(tenderId) => {
+              setSelectedTenderId(tenderId);
               setActiveTab('EVALUATION');
             }}
             onSelectBidder={(bId) => {
@@ -551,7 +587,10 @@ export default function App() {
           <TenderList
             tenders={tenders}
             submissions={submissions}
-            onSelectTender={() => setActiveTab('EVALUATION')}
+            onSelectTender={(tenderId) => {
+              setSelectedTenderId(tenderId);
+              setActiveTab('EVALUATION');
+            }}
             onOpenCreateTender={openCreateTender}
             canCreateTender={currentUser.role === 'PROCUREMENT_OFFICER'}
           />
@@ -564,7 +603,9 @@ export default function App() {
             bidders={bidders}
             submissions={submissions}
             selectedBidderId={selectedBidderId}
+            selectedTenderId={selectedTenderId}
             onSelectBidder={(id) => setSelectedBidderId(id)}
+            onApplyTender={handleApplyTender}
             requirements={requirements}
             verificationResults={verificationResults}
             documents={documents}

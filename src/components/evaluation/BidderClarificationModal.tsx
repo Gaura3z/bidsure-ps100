@@ -40,6 +40,7 @@ export const BidderClarificationModal: React.FC<BidderClarificationModalProps> =
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [confirmedDeclaration, setConfirmedDeclaration] = useState(true);
 
   if (!isOpen) return null;
@@ -48,6 +49,7 @@ export const BidderClarificationModal: React.FC<BidderClarificationModalProps> =
     e.preventDefault();
     if (!confirmedDeclaration || !selectedFile) return;
     setIsSubmitting(true);
+    setErrorMessage('');
 
     try {
       await onSubmitResponse({
@@ -62,7 +64,7 @@ export const BidderClarificationModal: React.FC<BidderClarificationModalProps> =
         onClose();
       }, 1800);
     } catch (err) {
-      console.error('Submission error:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'The evidence could not be submitted.');
     } finally {
       setIsSubmitting(false);
     }
@@ -128,6 +130,7 @@ export const BidderClarificationModal: React.FC<BidderClarificationModalProps> =
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+              {errorMessage && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-800">{errorMessage}</div>}
               {/* Document Type Selector */}
               <div>
                 <label className="block text-slate-700 font-bold mb-1">

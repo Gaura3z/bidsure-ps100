@@ -564,6 +564,14 @@ export const BidderEvaluationView: React.FC<BidderEvaluationViewProps> = ({
                         <div className="text-[11px] text-slate-500 font-mono">
                           {doc.fileSize} · {doc.docType} · {doc.pageCount} pages
                         </div>
+                        {(doc as any).status && (
+                          <div className="text-[10px] text-slate-500 mt-1">
+                            Security: {(doc as any).securityStatus || 'PENDING'} · OCR: {(doc as any).ocrStatus || 'PENDING'}
+                            {(doc as any).aiReviewStatus === 'SUPPORTS_CLAIM' && ' · AI supports claim'}
+                            {(doc as any).aiReviewStatus === 'DOES_NOT_SUPPORT' && ' · AI does not support claim'}
+                            {(doc as any).aiReviewStatus === 'NEEDS_MANUAL_REVIEW' && ' · AI review required'}
+                          </div>
+                        )}
                       </div>
                     </div>
 

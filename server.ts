@@ -747,6 +747,15 @@ app.post('/api/bidders/respond-clarification', upload.single('file'), async (req
 
   const fileHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
 
+  // Scan before durable storage so rejected files never enter local or object storage.
+  const malware = await scanForMalware(req.file.buffer);
+  if (malware.status === 'INFECTED') {
+    return res.status(422).json({ error: 'The uploaded document failed malware scanning.', scanEngine: malware.engine });
+  }
+  if (malware.status === 'FAILED') {
+    return res.status(503).json({ error: 'Malware scanning failed. The document was not stored.', scanEngine: malware.engine });
+  }
+
   const documentId = `doc-${Date.now()}`;
   let stored;
   try {
@@ -761,11 +770,27 @@ app.post('/api/bidders/respond-clarification', upload.single('file'), async (req
     return res.status(503).json({ error: error?.message || 'Document storage is unavailable.' });
   }
 
-  const malware = await scanForMalware(req.file.buffer);
-  if (malware.status === 'INFECTED') {
-    return res.status(422).json({ error: 'The uploaded document failed malware scanning.', scanEngine: malware.engine });
-  }
   const ocr = await extractTextWithConfiguredOcr({ buffer: req.file.buffer, mimeType: req.file.mimetype, documentId });
+
+  let evidenceReview: Record<string, any> = {
+    status: 'NOT_PROCESSED',
+    message: ocr.status === 'NOT_CONFIGURED' ? 'OCR is not configured on this deployment; an officer must inspect this evidence manually.' : 'Evidence is stored and awaiting officer review.',
+    provider: ocr.engine,
+  };
+  if ('text' in ocr && typeof ocr.text === 'string' && ocr.text.trim()) {
+    try {
+      const aiResponse = await aiProvider.generateContent(`You are reviewing one bidder clarification document for a procurement compliance workflow. Use only the OCR text below. Do not decide the tender outcome. Return JSON with status (SUPPORTS_CLAIM, DOES_NOT_SUPPORT, or NEEDS_MANUAL_REVIEW), summary, and extractedFacts (array of strings).\n\nDocument type: ${docType || 'Clarification evidence'}\nBidder remarks: ${remarks || ''}\nOCR text:\n${ocr.text.slice(0, 16000)}`, { responseMimeType: 'application/json' });
+      const parsed = JSON.parse(aiResponse.text || '{}');
+      evidenceReview = {
+        status: ['SUPPORTS_CLAIM', 'DOES_NOT_SUPPORT', 'NEEDS_MANUAL_REVIEW'].includes(parsed.status) ? parsed.status : 'NEEDS_MANUAL_REVIEW',
+        message: parsed.summary || 'AI extracted evidence facts for officer review.',
+        extractedFacts: Array.isArray(parsed.extractedFacts) ? parsed.extractedFacts.slice(0, 8) : [],
+        provider: aiResponse.providerUsed,
+      };
+    } catch (error: any) {
+      evidenceReview = { status: 'NEEDS_MANUAL_REVIEW', message: 'AI evidence assessment was unavailable; officer review is required.', provider: error?.message || 'AI_UNAVAILABLE' };
+    }
+  }
 
   // Add the uploaded document metadata after durable storage succeeds.
   const newDoc: BidDocument = {
@@ -786,6 +811,10 @@ app.post('/api/bidders/respond-clarification', upload.single('file'), async (req
     pageCount: 2,
     status: 'UPLOADED',
     uploadedAt: new Date().toISOString(),
+    aiReviewStatus: evidenceReview.status,
+    aiReviewMessage: evidenceReview.message,
+    aiReviewProvider: evidenceReview.provider,
+    aiExtractedFacts: evidenceReview.extractedFacts,
   };
   db.documents.push(newDoc);
 
@@ -812,6 +841,7 @@ app.post('/api/bidders/respond-clarification', upload.single('file'), async (req
     submission,
     document: newDoc,
     turnoverResult,
+    evidenceReview,
     message: 'Clarification response and evidence uploaded successfully. It is pending procurement officer review.',
   });
 });

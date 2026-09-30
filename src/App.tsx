@@ -401,7 +401,17 @@ export default function App() {
   // Vendor Clarification Response handler
   const handleRespondClarification = async (data: any) => {
     try {
-      await respondToClarification(data);
+      const response: any = await respondToClarification(data);
+
+      if (response?.document) {
+        setDocuments((previous) => [...previous.filter((document) => document.id !== response.document.id), response.document]);
+      }
+      if (response?.submission) {
+        setSubmissions((previous) => previous.map((submission) => submission.id === response.submission.id ? { ...submission, ...response.submission } : submission));
+      }
+      if (response?.turnoverResult) {
+        setVerificationResults((previous) => previous.map((result) => result.id === response.turnoverResult.id ? { ...result, ...response.turnoverResult } : result));
+      }
 
       // Refresh verification results and submissions from server
       const freshBidders = await fetchBidders();

@@ -118,6 +118,10 @@ export interface BidDocument {
   uploadedAt: string;
   previewUrl?: string;
   pageCount: number;
+  aiReviewStatus?: 'SUPPORTS_CLAIM' | 'DOES_NOT_SUPPORT' | 'NEEDS_MANUAL_REVIEW' | 'NOT_PROCESSED';
+  aiReviewMessage?: string;
+  aiReviewProvider?: string;
+  aiExtractedFacts?: string[];
 }
 
 export interface DocumentExtraction {

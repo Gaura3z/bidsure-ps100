@@ -30,7 +30,7 @@ export interface ProviderDiagnostic {
   primaryMasked: string | null;
   secondaryMasked: string | null;
   failoverReady: boolean;
-  mode: 'LIVE_GEMINI_AI' | 'DETERMINISTIC_GROUNDED_FALLBACK' | 'FAILOVER_ACTIVE';
+  mode: 'LIVE_AI' | 'DETERMINISTIC_GROUNDED_FALLBACK' | 'FAILOVER_ACTIVE';
   latencyMs?: number;
   message: string;
 }
@@ -268,7 +268,7 @@ class ResilientAIProvider {
         primaryMasked: primarySlot?.masked || null,
         secondaryMasked: secondarySlot?.masked || null,
         failoverReady: this.providers.length > 1,
-        mode: res.failoverOccurred ? 'FAILOVER_ACTIVE' : 'LIVE_GEMINI_AI',
+        mode: res.failoverOccurred ? 'FAILOVER_ACTIVE' : 'LIVE_AI',
         latencyMs: latency,
         message: `${res.providerUsed} is operational. Failover ready: ${this.providers.length > 1 ? 'YES' : 'NO'}.`,
       };
@@ -306,7 +306,7 @@ class ResilientAIProvider {
       primaryMasked: primarySlot?.masked || null,
       secondaryMasked: secondarySlot?.masked || null,
       failoverReady: this.providers.length > 1,
-      mode: configured ? 'LIVE_GEMINI_AI' : 'DETERMINISTIC_GROUNDED_FALLBACK',
+      mode: configured ? 'LIVE_AI' : 'DETERMINISTIC_GROUNDED_FALLBACK',
       message: configured
         ? `AI fallback chain is configured. Live availability is checked only when an AI operation runs.`
         : 'No OpenAI or Gemini provider key configured. Deterministic compliance rules are active.',

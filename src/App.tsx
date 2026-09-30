@@ -142,7 +142,7 @@ export default function App() {
   }, []);
 
   // Switch demo user
-  const handleSwitchUser = async (role: string) => {
+  const handleSwitchUser = async (role: string, email?: string, password?: string) => {
     const user = initialUsers.find((u) => u.role === role) || initialUsers[0];
     setCurrentUser(user);
     setActiveUserContext(user.role, user.id);
@@ -184,7 +184,7 @@ export default function App() {
     setTimeout(() => setRoleToast(null), 4000);
 
     try {
-      await loginAsRole(user.role);
+      await loginAsRole(user.role, email || user.email, password);
       const updatedBidders = await fetchBidders();
       if (Array.isArray(updatedBidders) && updatedBidders.length > 0) {
         setBidders(updatedBidders);
@@ -438,8 +438,8 @@ export default function App() {
         {activeTab === 'LOGIN' && (
           <LoginView
             currentUser={currentUser}
-            onLoginSuccess={(role, email) => {
-              handleSwitchUser(role);
+            onLoginSuccess={(role, email, password) => {
+              handleSwitchUser(role, email, password);
             }}
             onNavigateToDashboard={() => setActiveTab('DASHBOARD')}
           />

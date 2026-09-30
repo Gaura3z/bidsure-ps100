@@ -59,11 +59,11 @@ export async function fetchSession() {
   return requestJson(`${API_BASE}/session`);
 }
 
-export async function loginAsRole(role: string, email?: string) {
+export async function loginAsRole(role: string, email?: string, password?: string) {
   const result = await requestJson<{ success: boolean; user: User }>(`${API_BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ role, email }),
+    body: JSON.stringify({ role, email, password }),
   });
   if (result?.user) {
     setActiveUserContext(result.user.role, result.user.id);

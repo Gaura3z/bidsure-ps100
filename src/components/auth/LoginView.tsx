@@ -17,7 +17,7 @@ import { User } from '../../types/index.ts';
 
 interface LoginViewProps {
   currentUser: User;
-  onLoginSuccess: (role: string, email?: string) => void;
+  onLoginSuccess: (role: string, email?: string, password?: string) => void;
   onNavigateToDashboard: () => void;
 }
 
@@ -43,12 +43,12 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onLoginSuccess(selectedRole, email);
+    onLoginSuccess(selectedRole, email, password);
     onNavigateToDashboard();
   };
 
   const handleSsoLogin = () => {
-    onLoginSuccess(selectedRole, email);
+    onLoginSuccess(selectedRole, email, password);
     onNavigateToDashboard();
   };
 

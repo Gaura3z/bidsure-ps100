@@ -43,6 +43,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const underReviewCount = submissions.filter((s) => s.status === 'REVIEW_REQUIRED' || s.status === 'UNDER_VERIFICATION').length;
   const completedCount = submissions.filter((s) => s.status === 'QUALIFIED' || s.status === 'DISQUALIFIED').length;
   const attentionCount = submissions.filter((s) => s.riskLevel === 'HIGH' || s.status === 'REVIEW_REQUIRED').length;
+  const compliantCount = submissions.filter((s) => s.overallScore >= 80 && s.status !== 'REVIEW_REQUIRED').length;
+  const reviewCount = submissions.filter((s) => s.status === 'REVIEW_REQUIRED' || s.status === 'UNDER_VERIFICATION').length;
+  const nonCompliantCount = submissions.filter((s) => s.overallScore < 60 || s.status === 'DISQUALIFIED').length;
+  const overallScore = submissions.length
+    ? Math.round(submissions.reduce((total, submission) => total + submission.overallScore, 0) / submissions.length)
+    : 0;
+  const bidderSubmission = submissions.find((submission) => submission.bidderId === 'bidder-01');
 
   // Role-specific badge and subtitle
   const roleConfig = {
@@ -158,7 +165,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
             <div className="text-3xl font-extrabold text-amber-700 mt-2 font-mono tabular-nums">
-              82%
+              {bidderSubmission?.overallScore ?? 0}%
             </div>
             <div className="text-xs text-amber-600 mt-1 font-medium">
               Review Required by CPCL
@@ -191,7 +198,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
             <div className="text-3xl font-extrabold text-slate-900 mt-2 font-mono tabular-nums">
-              {activeTendersCount + 10}
+              {activeTendersCount}
             </div>
             <div className="text-xs text-slate-600 mt-1 flex items-center gap-1">
               <span className="text-emerald-700 font-semibold font-mono tabular-nums">+2</span> new this week
@@ -206,7 +213,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
             <div className="text-3xl font-extrabold text-slate-900 mt-2 font-mono tabular-nums">
-              {underReviewCount + 44}
+              {underReviewCount}
             </div>
             <div className="text-xs text-slate-600 mt-1 flex items-center gap-1">
               Across 4 active packages
@@ -221,7 +228,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
             <div className="text-3xl font-extrabold text-slate-900 mt-2 font-mono tabular-nums">
-              {completedCount + 33}
+              {completedCount}
             </div>
             <div className="text-xs text-emerald-700 mt-1 font-medium">
               100% audit recorded
@@ -236,7 +243,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
             <div className="text-3xl font-extrabold text-rose-700 mt-2 font-mono tabular-nums">
-              {attentionCount + 4}
+              {attentionCount}
             </div>
             <div className="text-xs text-rose-600 mt-1 font-medium">
               Discrepancies & knockouts
@@ -300,7 +307,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   />
                 </svg>
                 <div className="absolute flex flex-col items-center justify-center text-center">
-                  <span className="text-3xl font-extrabold text-slate-900 font-mono tracking-tight">82%</span>
+                  <span className="text-3xl font-extrabold text-slate-900 font-mono tracking-tight">{overallScore}%</span>
                   <span className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider">Compliance</span>
                 </div>
               </div>
@@ -313,21 +320,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <span className="w-2 h-2 rounded-full bg-emerald-700" />
                   <span>Compliant</span>
                 </div>
-                <div className="text-base font-bold text-slate-900 mt-0.5 font-mono">28</div>
+                <div className="text-base font-bold text-slate-900 mt-0.5 font-mono">{compliantCount}</div>
               </div>
               <div className="p-2 rounded-lg bg-amber-50/60">
                 <div className="flex items-center justify-center gap-1 text-amber-800 font-semibold">
                   <span className="w-2 h-2 rounded-full bg-amber-700" />
                   <span>Need Review</span>
                 </div>
-                <div className="text-base font-bold text-slate-900 mt-0.5 font-mono">12</div>
+                <div className="text-base font-bold text-slate-900 mt-0.5 font-mono">{reviewCount}</div>
               </div>
               <div className="p-2 rounded-lg bg-rose-50/60">
                 <div className="flex items-center justify-center gap-1 text-rose-800 font-semibold">
                   <span className="w-2 h-2 rounded-full bg-rose-700" />
                   <span>Non-Compliant</span>
                 </div>
-                <div className="text-base font-bold text-slate-900 mt-0.5 font-mono">7</div>
+                <div className="text-base font-bold text-slate-900 mt-0.5 font-mono">{nonCompliantCount}</div>
               </div>
             </div>
           </div>

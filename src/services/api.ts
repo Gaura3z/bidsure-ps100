@@ -83,6 +83,10 @@ export async function loginAsRole(role: string, email?: string, password?: strin
   return result;
 }
 
+export async function logout() {
+  return requestJson<{ success: boolean }>(`${API_BASE}/auth/logout`, { method: 'POST' }, 8000);
+}
+
 export async function fetchTenders(): Promise<Tender[]> {
   return requestJson<Tender[]>(`${API_BASE}/tenders`);
 }

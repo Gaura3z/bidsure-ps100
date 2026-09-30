@@ -38,6 +38,7 @@ import {
   recordOfficerDecision,
   setActiveUserContext,
   loginAsRole,
+  logout,
   respondToClarification,
 } from './services/api.ts';
 import { Navbar } from './components/common/Navbar.tsx';
@@ -248,6 +249,19 @@ export default function App() {
       ruleVersion: 'v2.4-2026',
     };
     setAuditEvents((prev) => [newAudit, ...prev]);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      setIsAuthenticated(false);
+      setAuthError('');
+      setActiveTab('LOGIN');
+      setRoleToast(null);
+      setCurrentUser(initialUsers[0]);
+      setActiveUserContext(initialUsers[0].role, initialUsers[0].id);
+    }
   };
 
   // Run AI & deterministic verification
@@ -480,6 +494,7 @@ export default function App() {
         onSwitchUser={handleSwitchUser}
         onOpenAdapters={() => setIsSourceGatewayModalOpen(true)}
         onOpenDatabase={() => setIsDatabaseModalOpen(true)}
+        onLogout={handleLogout}
       />
 
       {/* Main Content Area */}

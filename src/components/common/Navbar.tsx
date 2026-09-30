@@ -13,6 +13,7 @@ import {
   Database,
   Menu,
   X,
+  LogOut,
 } from 'lucide-react';
 import { ActiveTab, User } from '../../types/index.ts';
 
@@ -23,6 +24,7 @@ interface NavbarProps {
   onSwitchUser: (role: string, email?: string, password?: string) => void | Promise<void>;
   onOpenAdapters: () => void;
   onOpenDatabase: () => void;
+  onLogout: () => void | Promise<void>;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -32,6 +34,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSwitchUser,
   onOpenAdapters,
   onOpenDatabase,
+  onLogout,
 }) => {
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -283,8 +286,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 />
                 <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-slate-200 py-2 z-50 text-xs animate-in fade-in slide-in-from-top-2 duration-150">
                   <div className="px-3 py-1.5 border-b border-slate-100">
-                    <div className="font-semibold text-slate-900">Switch Demo Role</div>
-                    <div className="text-[11px] text-slate-500">Test different user workflows</div>
+                    <div className="font-semibold text-slate-900">Switch Profile</div>
+                    <div className="text-[11px] text-slate-500">Change your authorized workspace</div>
                   </div>
 
                   <button
@@ -330,6 +333,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <div className="font-semibold">Amit Patel (Bidder Vendor)</div>
                       <div className="text-[10px] text-slate-500">Uploads tender documents & views feedback</div>
                     </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      onLogout();
+                      setIsRoleDropdownOpen(false);
+                    }}
+                    className="w-full mt-1 border-t border-slate-100 px-3 pt-2 pb-1.5 text-left flex items-center gap-2 text-rose-700 hover:bg-rose-50 cursor-pointer font-semibold"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sign out securely
                   </button>
                 </div>
               </>
@@ -436,6 +450,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
           )}
+          <button
+            onClick={() => {
+              onLogout();
+              setIsMobileMenuOpen(false);
+            }}
+            className="w-full px-3 py-2 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign out securely
+          </button>
         </div>
       )}
     </header>

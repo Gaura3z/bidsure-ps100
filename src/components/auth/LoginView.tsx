@@ -22,6 +22,13 @@ interface LoginViewProps {
   authError?: string;
 }
 
+const demoPasswords: Record<string, string> = {
+  PROCUREMENT_OFFICER: 'Officer@BidSure2026!',
+  COMPLIANCE_ANALYST: 'Analyst@BidSure2026!',
+  BIDDER_VENDOR: 'Bidder@BidSure2026!',
+  ADMIN: 'Admin@BidSure2026!',
+};
+
 export const LoginView: React.FC<LoginViewProps> = ({
   currentUser,
   onLoginSuccess,
@@ -31,7 +38,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [selectedRole, setSelectedRole] = useState<'PROCUREMENT_OFFICER' | 'COMPLIANCE_ANALYST' | 'BIDDER_VENDOR' | 'ADMIN'>('PROCUREMENT_OFFICER');
   const [activeSubTab, setActiveSubTab] = useState<'SIGN_IN' | 'REGISTER'>('SIGN_IN');
   const [email, setEmail] = useState('officer@cpcl.gov.in');
-  const [password, setPassword] = useState('••••••••••••');
+  const [password, setPassword] = useState(demoPasswords.PROCUREMENT_OFFICER);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [registrationName, setRegistrationName] = useState('');
@@ -41,13 +48,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [registrationStatus, setRegistrationStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [registrationBusy, setRegistrationBusy] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
-
-  const demoPasswords: Record<string, string> = {
-    PROCUREMENT_OFFICER: 'Officer@BidSure2026!',
-    COMPLIANCE_ANALYST: 'Analyst@BidSure2026!',
-    BIDDER_VENDOR: 'Bidder@BidSure2026!',
-    ADMIN: 'Admin@BidSure2026!',
-  };
 
   const handleRoleSelect = (role: 'PROCUREMENT_OFFICER' | 'COMPLIANCE_ANALYST' | 'BIDDER_VENDOR' | 'ADMIN') => {
     setSelectedRole(role);

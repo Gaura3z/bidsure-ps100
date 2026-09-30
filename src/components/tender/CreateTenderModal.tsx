@@ -47,6 +47,7 @@ export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
   const [requiredDocuments, setRequiredDocuments] = useState<string[]>([]);
   const [newDocument, setNewDocument] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [publishError, setPublishError] = useState('');
   const [extractionError, setExtractionError] = useState('');
 
   const estimatedValue = Math.max(0, Number(estimatedInput || 0) * (
@@ -77,6 +78,7 @@ export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
 
   const handleCreate = async () => {
     setIsSubmitting(true);
+    setPublishError('');
     try {
       const newTender = await createTender({
         title,
@@ -111,6 +113,7 @@ export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
       onClose();
     } catch (err) {
       console.error('Failed to create tender:', err);
+      setPublishError(err instanceof Error ? err.message : 'Tender could not be published. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -383,6 +386,7 @@ export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
         {/* Step 4: Final Publish Confirmation */}
         {step === 4 && (
           <div className="space-y-4 text-xs">
+            {publishError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-800">{publishError}</div>}
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
               <div className="flex justify-between">
                 <span className="text-slate-500">Tender ID:</span>

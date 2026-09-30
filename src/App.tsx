@@ -55,6 +55,8 @@ import { DatabaseInspectorModal } from './components/database/DatabaseInspectorM
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('DASHBOARD');
   const [currentUser, setCurrentUser] = useState<User>(initialUsers[0]); // Rajesh Kumar (Procurement Officer)
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [tenders, setTenders] = useState<Tender[]>(initialTenders);
   const [bidders, setBidders] = useState<Bidder[]>(initialBidders);
   const [submissions, setSubmissions] = useState<BidSubmission[]>(initialSubmissions);
@@ -99,13 +101,19 @@ export default function App() {
       try {
         const session: any = await fetchSession();
         if (session?.currentUser) {
+          setIsAuthenticated(true);
           setCurrentUser(session.currentUser);
           setActiveUserContext(session.currentUser.role, session.currentUser.id);
           if (session.currentUser.role === 'BIDDER_VENDOR') {
             setSelectedBidderId('bidder-01');
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        setIsAuthenticated(false);
+        setActiveTab('LOGIN');
+      } finally {
+        setAuthChecked(true);
+      }
 
       try {
         const loadedTenders = await fetchTenders();
@@ -185,6 +193,7 @@ export default function App() {
 
     try {
       await loginAsRole(user.role, email || user.email, password);
+      setIsAuthenticated(true);
       const updatedBidders = await fetchBidders();
       if (Array.isArray(updatedBidders) && updatedBidders.length > 0) {
         setBidders(updatedBidders);
@@ -194,7 +203,8 @@ export default function App() {
         setAuditEvents(updatedAudits);
       }
     } catch (e) {
-      // Offline fallback already applied cleanly above
+      setIsAuthenticated(false);
+      setActiveTab('LOGIN');
     }
 
     const newAudit: AuditEvent = {
@@ -396,6 +406,27 @@ export default function App() {
       console.error('Failed to submit clarification:', e);
     }
   };
+
+  if (!authChecked) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center text-sm font-semibold text-slate-600">Loading secure session…</div>;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        <GovNoticeBanner onOpenAdapters={() => undefined} />
+        <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+          <LoginView
+            currentUser={currentUser}
+            onLoginSuccess={(role, email, password) => {
+              handleSwitchUser(role, email, password);
+            }}
+            onNavigateToDashboard={() => setActiveTab('DASHBOARD')}
+          />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-blue-600 selection:text-white">

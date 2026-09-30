@@ -339,6 +339,48 @@ export const initialRequirements: TenderRequirement[] = [
     weight: 12,
     ruleExpression: 'source.is_debarred == false && doc.notarized == true',
     createdAt: '2026-09-01T10:00:00Z',
+  },
+  {
+    id: 'req-12', tenderId: 'tender-002', clauseNumber: 'Clause 3.1', category: 'STATUTORY',
+    title: 'GST Registration', description: 'Bidder must possess a valid, active GSTIN registration.',
+    isMandatory: true, isKnockout: true, thresholdType: 'EQUALS', thresholdValue: 'ACTIVE',
+    evidenceDocType: 'GST Certificate', sourceAdapter: 'GSTN', severity: 'CRITICAL', weight: 10,
+    ruleExpression: 'source.status == "ACTIVE"', createdAt: '2026-09-05T10:00:00Z',
+  },
+  {
+    id: 'req-13', tenderId: 'tender-002', clauseNumber: 'Clause 3.2', category: 'STATUTORY',
+    title: 'PAN Verification', description: 'Valid PAN matching the bidder legal entity name.',
+    isMandatory: true, isKnockout: true, thresholdType: 'EXISTS', thresholdValue: 'VALID',
+    evidenceDocType: 'PAN Card', sourceAdapter: 'INCOME_TAX', severity: 'CRITICAL', weight: 10,
+    ruleExpression: 'document.pan.valid == true', createdAt: '2026-09-05T10:00:00Z',
+  },
+  {
+    id: 'req-14', tenderId: 'tender-002', clauseNumber: 'Clause 4.1', category: 'TECHNICAL_EXPERIENCE',
+    title: 'Process Equipment Experience', description: 'Minimum 3 years of experience supplying refinery process instrumentation or high-pressure valves.',
+    isMandatory: true, isKnockout: true, thresholdType: 'MIN_NUMERIC', thresholdValue: '3',
+    evidenceDocType: 'Experience Certificate', sourceAdapter: 'MANUAL', severity: 'HIGH', weight: 20,
+    ruleExpression: 'experience.years >= 3', createdAt: '2026-09-05T10:00:00Z',
+  },
+  {
+    id: 'req-15', tenderId: 'tender-002', clauseNumber: 'Clause 5.1', category: 'FINANCIAL',
+    title: 'Annual Turnover', description: 'Audited average annual turnover of at least ₹5 Crore for the last three financial years.',
+    isMandatory: true, isKnockout: true, thresholdType: 'MIN_NUMERIC', thresholdValue: '50000000',
+    evidenceDocType: 'Turnover Certificate', sourceAdapter: 'MANUAL', severity: 'CRITICAL', weight: 20,
+    ruleExpression: 'turnover.average >= 50000000', createdAt: '2026-09-05T10:00:00Z',
+  },
+  {
+    id: 'req-16', tenderId: 'tender-002', clauseNumber: 'Clause 6.1', category: 'OEM_AUTHORIZATION',
+    title: 'OEM Authorization and Warranty', description: 'Tender-specific OEM authorization with a minimum 5-year warranty for supplied equipment.',
+    isMandatory: true, isKnockout: true, thresholdType: 'EXISTS', thresholdValue: 'VALID',
+    evidenceDocType: 'OEM Authorization', sourceAdapter: 'MANUAL', severity: 'HIGH', weight: 20,
+    ruleExpression: 'oem.authorization.valid == true && warranty.years >= 5', createdAt: '2026-09-05T10:00:00Z',
+  },
+  {
+    id: 'req-17', tenderId: 'tender-002', clauseNumber: 'Clause 7.1', category: 'LABOUR_COMPLIANCE',
+    title: 'Safety and Statutory Compliance', description: 'Bidder must provide applicable labour, safety, and statutory compliance declarations.',
+    isMandatory: true, isKnockout: false, thresholdType: 'EXISTS', thresholdValue: 'VALID',
+    evidenceDocType: 'Compliance Declaration', sourceAdapter: 'MANUAL', severity: 'MEDIUM', weight: 10,
+    ruleExpression: 'declaration.signed == true', createdAt: '2026-09-05T10:00:00Z',
   }
 ];
 

@@ -82,12 +82,14 @@ export default function App() {
 
   const [roleToast, setRoleToast] = useState<{ role: string; name: string; title: string; desc: string } | null>(null);
   const navigationReady = useRef(false);
+  const createTenderModalRef = useRef(false);
+  createTenderModalRef.current = isCreateTenderModalOpen;
 
   useEffect(() => {
     window.history.replaceState({ ...window.history.state, bidsureTab: activeTab }, '', window.location.href);
     navigationReady.current = true;
     const handlePopState = (event: PopStateEvent) => {
-      if (isCreateTenderModalOpen) {
+      if (createTenderModalRef.current) {
         setIsCreateTenderModalOpen(false);
         return;
       }

@@ -676,6 +676,8 @@ app.post('/api/compliance/run-verification', async (req: Request, res: Response)
     } else if (r.status === 'NEEDS_REVIEW') {
       review++;
       earnedScoreWeight += weight * 0.5;
+    } else if (r.status === 'UNVERIFIED') {
+      review++;
     } else if (r.status === 'FAIL') {
       failed++;
     }
@@ -689,7 +691,7 @@ app.post('/api/compliance/run-verification', async (req: Request, res: Response)
   submission.checksReview = review;
   submission.checksFailed = failed;
   submission.riskLevel = hasKnockoutFailure || failed > 1 ? 'HIGH' : review > 0 ? 'MEDIUM' : 'LOW';
-  submission.status = hasKnockoutFailure ? 'REVIEW_REQUIRED' : review > 0 ? 'REVIEW_REQUIRED' : 'QUALIFIED';
+  submission.status = hasKnockoutFailure || review > 0 ? 'REVIEW_REQUIRED' : 'QUALIFIED';
   submission.verifiedAt = new Date().toISOString();
 
   const scoreRecord = {
@@ -744,14 +746,13 @@ Output a structured JSON response:
   }
 
   if (!aiSummary) {
-    aiSummary = `The bidder meets statutory registrations across GSTN, Udyam, EPFO and ESIC. However, annual turnover of ₹${(bidder?.annualTurnover || 0) / 10000000} Cr is below the tender threshold of ₹5.00 Cr, and the OEM Authorization letter requires manual verification for tender reference clarity. Overall compliance score is ${finalScore}% with ${submission.riskLevel} risk.`;
-    keyFindings = [
-      'All statutory registrations (GST, Udyam, PAN, EPFO, ESIC) are verified and active.',
-      'Income tax return filed for AY 2023-24 and AY 2024-25.',
-      `Turnover deficit: Certified turnover of ₹${(bidder?.annualTurnover || 0) / 10000000} Cr vs required ≥ ₹5.00 Cr.`,
-      'OEM authorization document stamp is low contrast and tender ID is hand-annotated.',
-      'No debarment or blacklisting records found across Central GeM repository.',
-    ];
+    const notSubmitted = results.filter((result) => result.status === 'UNVERIFIED').length;
+    aiSummary = notSubmitted
+      ? `${notSubmitted} tender requirement(s) still need document evidence. The bid remains under review; no qualification decision is inferred from missing files. Current score: ${finalScore}%.`
+      : `The deterministic rules engine assessed ${results.length} requirement(s): ${passed} passed, ${review} need review, and ${failed} failed. Final officer review is required for outstanding findings. Current score: ${finalScore}%.`;
+    keyFindings = notSubmitted
+      ? [`Evidence is missing for ${notSubmitted} requirement(s).`, 'Upload the requested files before the officer completes the review.']
+      : [`${passed} requirement(s) passed.`, `${review} requirement(s) need review.`, `${failed} requirement(s) failed.`];
   }
 
   const recommendationRecord = {

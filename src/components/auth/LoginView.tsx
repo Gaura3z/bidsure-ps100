@@ -33,12 +33,20 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
+  const demoPasswords: Record<string, string> = {
+    PROCUREMENT_OFFICER: 'Officer@BidSure2026!',
+    COMPLIANCE_ANALYST: 'Analyst@BidSure2026!',
+    BIDDER_VENDOR: 'Bidder@BidSure2026!',
+    ADMIN: 'Admin@BidSure2026!',
+  };
+
   const handleRoleSelect = (role: 'PROCUREMENT_OFFICER' | 'COMPLIANCE_ANALYST' | 'BIDDER_VENDOR' | 'ADMIN') => {
     setSelectedRole(role);
     if (role === 'PROCUREMENT_OFFICER') setEmail('officer@cpcl.gov.in');
     else if (role === 'COMPLIANCE_ANALYST') setEmail('analyst@cpcl.gov.in');
     else if (role === 'BIDDER_VENDOR') setEmail('bidder@abctechnologies.com');
     else setEmail('admin@bidsure.gov.in');
+    setPassword(demoPasswords[role]);
   };
 
   const handleSubmit = (e: React.FormEvent) => {

@@ -10,8 +10,6 @@ import {
   UserCheck,
   Building2,
   ExternalLink,
-  LogIn,
-  Home,
   Database,
   Menu,
   X,
@@ -45,8 +43,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isAnalyst = currentUser.role === 'COMPLIANCE_ANALYST';
 
   const navItems = [
-    { id: 'LANDING' as ActiveTab, label: 'Landing', icon: Home, visible: true },
-    { id: 'LOGIN' as ActiveTab, label: 'Login', icon: LogIn, visible: true },
     { id: 'DASHBOARD' as ActiveTab, label: 'Dashboard', icon: LayoutDashboard, visible: true },
     {
       id: 'TENDERS' as ActiveTab,

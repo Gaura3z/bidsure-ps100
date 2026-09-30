@@ -111,10 +111,11 @@ export default function App() {
   };
 
   const roleCanUseTab = (tab: ActiveTab) => {
+    if (tab === 'LANDING' || tab === 'LOGIN') return false;
     if (tab === 'SOURCE_GATEWAY') {
       return ['PROCUREMENT_OFFICER', 'COMPLIANCE_ANALYST', 'ADMIN'].includes(currentUser.role);
     }
-    return true;
+    return ['DASHBOARD', 'TENDERS', 'EVALUATION', 'COMPLIANCE_MATRIX', 'AUDIT_TRAIL'].includes(tab);
   };
 
   useEffect(() => {
@@ -562,45 +563,31 @@ export default function App() {
 
           <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3 text-xs font-medium">
             <button
-              onClick={() => setActiveTab('LANDING')}
-              className="hover:text-blue-700 cursor-pointer"
-            >
-              1. Landing
-            </button>
-            <span>·</span>
-            <button
-              onClick={() => setActiveTab('LOGIN')}
-              className="hover:text-blue-700 cursor-pointer"
-            >
-              2. Login
-            </button>
-            <span>·</span>
-            <button
               onClick={() => setActiveTab('DASHBOARD')}
               className="hover:text-blue-700 cursor-pointer"
             >
-              3. Dashboard
+              Dashboard
             </button>
             <span>·</span>
             <button
               onClick={() => setActiveTab('TENDERS')}
               className="hover:text-blue-700 cursor-pointer"
             >
-              4. Tenders
+              Tenders
             </button>
             <span>·</span>
             <button
               onClick={() => setActiveTab('EVALUATION')}
               className="hover:text-blue-700 cursor-pointer"
             >
-              5. Evaluation
+              Evaluation
             </button>
             <span>·</span>
             <button
               onClick={() => setActiveTab('AUDIT_TRAIL')}
               className="hover:text-blue-700 cursor-pointer"
             >
-              6. Audit
+              Audit
             </button>
             <span>·</span>
             <button

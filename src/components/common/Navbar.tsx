@@ -20,7 +20,7 @@ interface NavbarProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
   currentUser: User;
-  onSwitchUser: (role: string) => void;
+  onSwitchUser: (role: string, email?: string, password?: string) => void | Promise<void>;
   onOpenAdapters: () => void;
   onOpenDatabase: () => void;
 }
@@ -41,6 +41,17 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isAdmin = currentUser.role === 'ADMIN';
   const isOfficer = currentUser.role === 'PROCUREMENT_OFFICER';
   const isAnalyst = currentUser.role === 'COMPLIANCE_ANALYST';
+  const profileCredentials: Record<string, { email: string; password: string }> = {
+    PROCUREMENT_OFFICER: { email: 'officer@cpcl.gov.in', password: 'Officer@BidSure2026!' },
+    COMPLIANCE_ANALYST: { email: 'analyst@cpcl.gov.in', password: 'Analyst@BidSure2026!' },
+    BIDDER_VENDOR: { email: 'bidder@abctechnologies.com', password: 'Bidder@BidSure2026!' },
+  };
+  const switchProfile = (role: string) => {
+    const credentials = profileCredentials[role];
+    onSwitchUser(role, credentials?.email, credentials?.password);
+    setIsRoleDropdownOpen(false);
+    setIsMobileMenuOpen(false);
+  };
 
   const navItems = [
     { id: 'DASHBOARD' as ActiveTab, label: 'Dashboard', icon: LayoutDashboard, visible: true },
@@ -264,7 +275,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             {/* Role Switcher Menu */}
-            {false && isRoleDropdownOpen && (
+            {isRoleDropdownOpen && (
               <>
                 <div
                   className="fixed inset-0 z-45"
@@ -278,8 +289,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                   <button
                     onClick={() => {
-                      onSwitchUser('PROCUREMENT_OFFICER');
-                      setIsRoleDropdownOpen(false);
+                      switchProfile('PROCUREMENT_OFFICER');
                     }}
                     className={`w-full px-3 py-2 text-left flex items-start gap-2 hover:bg-slate-50 cursor-pointer ${
                       currentUser.role === 'PROCUREMENT_OFFICER' ? 'bg-blue-50 text-blue-800' : 'text-slate-700'
@@ -294,8 +304,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                   <button
                     onClick={() => {
-                      onSwitchUser('COMPLIANCE_ANALYST');
-                      setIsRoleDropdownOpen(false);
+                      switchProfile('COMPLIANCE_ANALYST');
                     }}
                     className={`w-full px-3 py-2 text-left flex items-start gap-2 hover:bg-slate-50 cursor-pointer ${
                       currentUser.role === 'COMPLIANCE_ANALYST' ? 'bg-blue-50 text-blue-800' : 'text-slate-700'
@@ -310,8 +319,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                   <button
                     onClick={() => {
-                      onSwitchUser('BIDDER_VENDOR');
-                      setIsRoleDropdownOpen(false);
+                      switchProfile('BIDDER_VENDOR');
                     }}
                     className={`w-full px-3 py-2 text-left flex items-start gap-2 hover:bg-slate-50 cursor-pointer ${
                       currentUser.role === 'BIDDER_VENDOR' ? 'bg-blue-50 text-blue-800' : 'text-slate-700'
@@ -342,13 +350,12 @@ export const Navbar: React.FC<NavbarProps> = ({
       {isMobileMenuOpen && (
         <div className="md:hidden border-t border-slate-200 bg-white p-3 space-y-2 shadow-lg animate-in slide-in-from-top-2 duration-150 text-xs font-semibold">
           {/* Mobile Role Switcher */}
-          <div className="hidden p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
+          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
             <div className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Switch Profile:</div>
             <div className="grid grid-cols-1 gap-1">
               <button
                 onClick={() => {
-                  onSwitchUser('PROCUREMENT_OFFICER');
-                  setIsMobileMenuOpen(false);
+                  switchProfile('PROCUREMENT_OFFICER');
                 }}
                 className={`px-2.5 py-1.5 rounded text-left text-xs font-bold flex items-center gap-2 cursor-pointer ${
                   isOfficer ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 border border-slate-200'
@@ -359,8 +366,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
               <button
                 onClick={() => {
-                  onSwitchUser('COMPLIANCE_ANALYST');
-                  setIsMobileMenuOpen(false);
+                  switchProfile('COMPLIANCE_ANALYST');
                 }}
                 className={`px-2.5 py-1.5 rounded text-left text-xs font-bold flex items-center gap-2 cursor-pointer ${
                   isAnalyst ? 'bg-purple-600 text-white' : 'bg-white text-slate-700 border border-slate-200'
@@ -371,8 +377,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
               <button
                 onClick={() => {
-                  onSwitchUser('BIDDER_VENDOR');
-                  setIsMobileMenuOpen(false);
+                  switchProfile('BIDDER_VENDOR');
                 }}
                 className={`px-2.5 py-1.5 rounded text-left text-xs font-bold flex items-center gap-2 cursor-pointer ${
                   isBidder ? 'bg-emerald-600 text-white' : 'bg-white text-slate-700 border border-slate-200'

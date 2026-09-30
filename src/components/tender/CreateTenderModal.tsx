@@ -18,6 +18,15 @@ interface CreateTenderModalProps {
   onTenderCreated: (newTender: Tender) => void;
 }
 
+const localRequirementFallback = [
+  { clauseNumber: 'Clause 3.1', category: 'STATUTORY', title: 'GST Registration Verification', description: 'Bidder must possess active GSTIN registration.', isMandatory: true, isKnockout: true, evidenceDocType: 'GST Registration Certificate', sourceAdapter: 'GSTN' },
+  { clauseNumber: 'Clause 3.2', category: 'STATUTORY', title: 'PAN Verification', description: 'Bidder must provide a valid PAN record.', isMandatory: true, isKnockout: true, evidenceDocType: 'PAN Card or PAN Verification Record', sourceAdapter: 'INCOME_TAX' },
+  { clauseNumber: 'Clause 5.1', category: 'FINANCIAL', title: 'Minimum Annual Turnover', description: 'Audited turnover certificate meeting the tender threshold.', isMandatory: true, isKnockout: true, evidenceDocType: 'CA Turnover Certificate with UDIN', sourceAdapter: 'MANUAL' },
+  { clauseNumber: 'Clause 6.1', category: 'TECHNICAL_EXPERIENCE', title: 'Relevant Experience', description: 'Minimum CPSE or Central Government experience.', isMandatory: true, isKnockout: true, evidenceDocType: 'Experience Certificate', sourceAdapter: 'MANUAL' },
+  { clauseNumber: 'Clause 7.1', category: 'OEM_AUTHORIZATION', title: 'OEM Authorization', description: 'Tender-specific authorization from the OEM.', isMandatory: true, isKnockout: true, evidenceDocType: 'OEM Manufacturer Authorization Letter', sourceAdapter: 'MANUAL' },
+  { clauseNumber: 'Clause 10.1', category: 'DEBARMENT_CHECK', title: 'Non-Blacklisting Declaration', description: 'Bidder must not be debarred or blacklisted.', isMandatory: true, isKnockout: true, evidenceDocType: 'Non-Blacklisting Declaration', sourceAdapter: 'DEBARMENT' },
+];
+
 export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
   isOpen,
   onClose,
@@ -37,11 +46,13 @@ export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
   const [requiredDocuments, setRequiredDocuments] = useState<string[]>([]);
   const [newDocument, setNewDocument] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [extractionError, setExtractionError] = useState('');
 
   if (!isOpen) return null;
 
   const handleExtractAI = async () => {
     setIsExtracting(true);
+    setExtractionError('');
     try {
       const data = await extractRequirementsAI(tenderDocumentText, title);
       setExtractedRequirements(data.requirements || []);
@@ -50,6 +61,10 @@ export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
       setStep(3);
     } catch (e) {
       console.error('AI extraction error:', e);
+      setExtractedRequirements(localRequirementFallback);
+      setRequiredDocuments(localRequirementFallback.map((requirement) => requirement.evidenceDocType));
+      setExtractionError('Live AI was unavailable, so grounded fallback rules were loaded. Review them before publishing.');
+      setStep(3);
     } finally {
       setIsExtracting(false);
     }
@@ -244,6 +259,7 @@ export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
               </div>
               <p className="text-[11px] text-slate-500">Tender scope text is ready for AI requirement extraction · GeM Standard Bid Document v4.0</p>
             </div>
+            {extractionError && <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-900">{extractionError}</div>}
 
             <div className="pt-3 flex items-center justify-between">
               <button
@@ -279,6 +295,7 @@ export const CreateTenderModal: React.FC<CreateTenderModalProps> = ({
         {/* Step 3: Extracted Requirements Review */}
         {step === 3 && (
           <div className="space-y-3 text-xs">
+            {extractionError && <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-900">{extractionError}</div>}
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-900">
                 AI Extracted Eligibility Clauses ({extractedRequirements.length})

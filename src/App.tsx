@@ -56,6 +56,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User>(initialUsers[0]); // Rajesh Kumar (Procurement Officer)
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authError, setAuthError] = useState('');
   const [tenders, setTenders] = useState<Tender[]>(initialTenders);
   const [bidders, setBidders] = useState<Bidder[]>(initialBidders);
   const [submissions, setSubmissions] = useState<BidSubmission[]>(initialSubmissions);
@@ -178,6 +179,7 @@ export default function App() {
 
   // Switch demo user
   const handleSwitchUser = async (role: string, email?: string, password?: string) => {
+    setAuthError('');
     const user = initialUsers.find((u) => u.role === role) || initialUsers[0];
     setCurrentUser(user);
     setActiveUserContext(user.role, user.id);
@@ -227,6 +229,7 @@ export default function App() {
     } catch (e) {
       setIsAuthenticated(false);
       setActiveTab('LOGIN');
+      setAuthError(e instanceof Error ? e.message : 'Sign-in failed. Please check the selected account and try again.');
     }
 
     const newAudit: AuditEvent = {
@@ -451,9 +454,10 @@ export default function App() {
           <LoginView
             currentUser={currentUser}
             onLoginSuccess={(role, email, password) => {
-              handleSwitchUser(role, email, password);
+              return handleSwitchUser(role, email, password);
             }}
             onNavigateToDashboard={() => setActiveTab('DASHBOARD')}
+            authError={authError}
           />
         </main>
       </div>
@@ -500,9 +504,10 @@ export default function App() {
           <LoginView
             currentUser={currentUser}
             onLoginSuccess={(role, email, password) => {
-              handleSwitchUser(role, email, password);
+              return handleSwitchUser(role, email, password);
             }}
             onNavigateToDashboard={() => setActiveTab('DASHBOARD')}
+            authError={authError}
           />
         )}
 

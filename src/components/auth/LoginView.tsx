@@ -19,12 +19,14 @@ interface LoginViewProps {
   currentUser: User;
   onLoginSuccess: (role: string, email?: string, password?: string) => void | Promise<void>;
   onNavigateToDashboard: () => void;
+  authError?: string;
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({
   currentUser,
   onLoginSuccess,
   onNavigateToDashboard,
+  authError,
 }) => {
   const [selectedRole, setSelectedRole] = useState<'PROCUREMENT_OFFICER' | 'COMPLIANCE_ANALYST' | 'BIDDER_VENDOR' | 'ADMIN'>('PROCUREMENT_OFFICER');
   const [activeSubTab, setActiveSubTab] = useState<'SIGN_IN' | 'REGISTER'>('SIGN_IN');
@@ -142,6 +144,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
         </div>
 
         <div className="p-6 space-y-5">
+          {authError && activeSubTab === 'SIGN_IN' && (
+            <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+              {authError}
+            </div>
+          )}
           {/* Select Your Role (matching screenshot 2) */}
           <div>
             <label className="block text-xs font-bold text-slate-800 mb-2">
